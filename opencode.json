@@ -1,0 +1,25 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "openrouter": {
+      "options": {
+        "apiKey": "{env:OPENROUTER_KEY}"
+      }
+    }
+  },
+  "mcp": {
+    "playwright": {
+      "type": "local",
+      "command": [
+        "distrobox-host-exec",
+        "podman",
+        "run",
+        "-i",
+        "--rm",
+        "mcp/playwright:latest"
+      ],
+      "enabled": true
+    }
+  }
+}
+
