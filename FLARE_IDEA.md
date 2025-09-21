@@ -18,11 +18,9 @@ My webhost is IONOS.com, which is a PHP-based host, so our backend needs to be w
 
 Additionally, the host offers MySQL data integration for any data we need to save serverside.
 
-This means, however, that any front-end system we build needs to be built on my machine, then uploaded to the host - the server doesn't support `npm`, `node`, or other non-PHP languages or processes.
+This means, however, that any front-end system we build needs to be in vanilla JS/CSS/HTML and uploaded to the host - the server doesn't support `npm`, `node`, or other non-PHP languages or processes.
 
-# Development
-
-For local development, it would probably make the most sense to define a Podman Compose configuration to host a PHP container, a MySQL container, and a Playwright container, all on the same network, to allow easy local development.
+Additionally, any server-side API keys, DB credentials, etc. should be loaded from a config.php file.
 
 # User Identity
 
@@ -30,19 +28,19 @@ I'd like to create a passwordless login system, where a user visiting for the fi
 
 We'd generate an email with a token, and the user would click or copy/paste the link into a browser. That page would set the token state to "Validated", and the original page/device would eventually poll, see "Validated," and then setup the user's localStorage/state. Subsequent actions/calls to the backend would use that token to represent the user's access.
 
-# Questions / Answers
+After the user is authenticated to our system, they will then go through the EXTERNAL auth systems they wish to use (Steam, Epic, etc.) - these won't have any idea about the passwordless flow.
 
-## Priority 1: Database Schema Design
+# Development
 
- What database schema will support both passwordless authentication tokens and multiple platform game library integrations?
+For local development, it would probably make the most sense to define a Podman Compose configuration to host a PHP container, a MySQL container, and a Playwright container, all on the same network, to allow easy local development.
 
- • Needs to store email tokens, SteamID64s, Epic accounts, GOG accounts
- • Must maintain relationships between users and their linked platforms
- • Critical for core functionality
+## Front-end
 
-### ANSWER:
+Use vanilla JS, CSS, and HTML to build the front-end. Use reusable function calls and abstractions around the auth flows and redirects, but don't worry about package.json, dependencies, build modules, webpack, etc.
 
-Use this as a pseudo-design - field and table names should follow syntax best practices of MySQL (dashes, underscores, plural, etc.)
+## Backend
+
+## Database Schema
 
 ```
 users
@@ -63,25 +61,8 @@ user-tokens
 - user-id (FK to users)
 - state (Pending, Validated, Disabled)
 
-config
-- id (guid)
-- ext-system (steam, epic, gog, etc.)
-- clientId (whatever token/key/etc. we use to identify our app on the API)
 ```
 
-## Priority 1: Authentication System Integration
-
- How will the passwordless email login system integrate with Steam's OpenID 2.0 authentication and other platform authentication methods?
-
- • Must handle secure server-side OpenID assertion verification
- • Needs to unify email-based identity with platform-specific IDs
- • Critical for user identity management and security
-
-### Answer:
-
-See the DB table above 
-
-- each "External System" will have its "ClientId" in the `config` table
 - each user will have multiple entries in the `user-accounts` (one per external system they use)
     * Each record should, technically, only ever have EITHER a nonce, or a extId
     * We should generate the nonce before hand-off, then delete it when we get the externalId back
@@ -91,30 +72,58 @@ See the DB table above
     * When the user clicks or copies the guid into our validation form, it changes the state to "Validated"
     * The user should have a way to "invalidate all tokens" for their account
 
-## Priority 1: API Key Management & Security
+## Explanation of "Passwordless" Vs. "External Auth"
 
- What is the strategy for securely storing and managing Steam API keys and other platform credentials in the PHP/MySQL environment?
+1. Passwordless email auth establishes the user's identity in OUR system
+2. Platform authentication flows are separate, isolated processes that simply add platform-specific identifiers to an already-authenticated user
+3. There's no "unification" needed - the external auth just provides additional identifiers
 
- • Requires secure storage (environment variables, encrypted database)
- • Must prevent tampering and ensure server-side verification
- • Essential for platform integration security
+## Game List Caching
 
-### Answer
+Given IONOS constraints and Steam API characteristics, implement file-based caching with 5-minute timeouts:
 
-DB credentials will follow the normal PHP process of a config file
-API keys will be in a config table in the DB.
+### Implementation Approach
 
-## Priority 2: Frontend Build & Deployment Pipeline
+1. **Cache Structure**: Store each user's game library data in individual files
+   - File naming: `cache/{user_id}_{platform}_games.json`
+   - Include timestamp metadata for expiration checking
 
- How will the frontend build process work given IONOS PHP-only hosting constraints?
+2. **Cache Logic**:
+```php
+function getCachedGames($userId, $platform) {
+    $cacheFile = "cache/{$userId}_{$platform}_games.json";
 
- • Requires local build process for static assets
- • Affects development workflow and deployment strategy
- • Important for maintainability
+    if (file_exists($cacheFile)) {
+        $data = json_decode(file_get_contents($cacheFile), true);
+        $age = time() - $data['timestamp'];
 
-### Answer
+        if ($age < 300) { // 5 minutes
+            return $data['games'];
+        }
+    }
 
-I think the easiest solution is to plan to do some sort of `npm build` command on my local machine, then upload the resulting assets to the host, along with any server-side PHP pages.
+    // Fetch fresh data from API
+    $games = fetchGamesFromPlatform($userId, $platform);
+
+    // Cache with timestamp
+    $cacheData = [
+        'timestamp' => time(),
+        'games' => $games
+    ];
+    file_put_contents($cacheFile, json_encode($cacheData));
+
+    return $games;
+}
+```
+
+3. Considerations:
+ • Use include_appinfo=true judiciously to reduce payload size
+ • Implement compression for large libraries (1000+ games)
+ • Handle cache directory permissions and cleanup
+ • The Steam API has data lag, making 5-minute caching acceptable
+
+
+# Questions / Answers
 
 ## Priority 2: Local Development Environment
 
