@@ -1,6 +1,11 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "provider": {
+    "google": {
+      "options": {
+        "apiKey": "{env:LLM_GEMINI_KEY}"
+      }
+    },
     "openrouter": {
       "options": {
         "apiKey": "{env:OPENROUTER_KEY}"
