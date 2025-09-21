@@ -9,6 +9,11 @@
     "openrouter": {
       "options": {
         "apiKey": "{env:OPENROUTER_KEY}"
+      },
+      "models": {
+        "deepseek/deepseek-chat-v3.1:free": {
+          "name": "DeepSeek V3.1 (free)"
+        }
       }
     }
   },
