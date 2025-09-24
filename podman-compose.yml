@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: flare-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: flare_db
+      MYSQL_USER: app_user
+      MYSQL_PASSWORD: apppass
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - flare-network
+    ports:
+      - "3306:3306"
+
+  php-apache:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: flare-php
+    restart: unless-stopped
+    depends_on:
+      - mysql
+    environment:
+      DB_HOST: mysql
+      DB_NAME: flare_db
+      DB_USER: app_user
+      DB_PASS: apppass
+    volumes:
+      - .:/var/www/html
+    networks:
+      - flare-network
+    ports:
+      - "8080:80"
+
+  playwright:
+    image: mcr.microsoft.com/playwright:v1.45.0-jammy
+    container_name: flare-playwright
+    working_dir: /tests
+    volumes:
+      - ./tests:/tests
+      - /dev/shm:/dev/shm
+    depends_on:
+      - php-apache
+    networks:
+      - flare-network
+    environment:
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+    command: sleep infinity
+
+networks:
+  flare-network:
+    driver: bridge
+
+volumes:
+  mysql_data:

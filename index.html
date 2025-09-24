@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FLARE Game Library Aggregator</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Unauthenticated State -->
+    <div id="unauthenticated" data-auth-state="unauthenticated">
+        <div class="auth-container">
+            <h1>Welcome to FLARE</h1>
+            <p>Enter your email to get started with passwordless login.</p>
+            <form id="email-form">
+                <input type="email" id="email-input" placeholder="your@email.com" required aria-label="Email address">
+                <button type="submit" class="submit-btn">Send Token</button>
+            </form>
+            <div id="error-message" class="error-toast" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Pending State -->
+    <div id="pending" data-auth-state="pending" style="display: none;">
+        <div class="auth-container">
+            <h1>Check Your Email</h1>
+            <p>We've sent a verification link to your email. Click it to continue.</p>
+            <div class="polling-indicator">⏳ Verifying...</div>
+            <button id="resend-btn" class="submit-btn">Resend Token</button>
+        </div>
+    </div>
+
+    <!-- Validated State - Dashboard -->
+    <div id="dashboard" data-auth-state="validated" style="display: none;">
+        <header>
+            <h1>FLARE Dashboard</h1>
+            <div id="user-info"></div>
+            <button id="logout-btn">Logout</button>
+        </header>
+
+        <section id="platforms-section">
+            <h2>Connect Platforms</h2>
+            <div id="platforms-grid" class="platform-grid">
+                <div class="platform-card" data-platform="steam" data-status="disconnected">
+                    <div class="platform-icon">🟦</div>
+                    <h3>Steam</h3>
+                    <p>Connect your Steam library</p>
+                    <button class="connect-btn">Connect</button>
+                </div>
+                <div class="platform-card" data-platform="epic" data-status="disconnected">
+                    <div class="platform-icon">🟦</div>
+                    <h3>Epic Games</h3>
+                    <p>Connect your Epic library</p>
+                    <button class="connect-btn">Connect</button>
+                </div>
+                <div class="platform-card" data-platform="gog" data-status="disconnected">
+                    <div class="platform-icon">🟣</div>
+                    <h3>GOG</h3>
+                    <p>Connect your GOG library</p>
+                    <button class="connect-btn">Connect</button>
+                </div>
+                <div class="platform-card" data-platform="itch" data-status="disconnected">
+                    <div class="platform-icon">🔴</div>
+                    <h3>itch.io</h3>
+                    <p>Connect your itch.io collection</p>
+                    <button class="connect-btn">Connect</button>
+                </div>
+                <div class="platform-card" data-platform="humble" data-status="disconnected">
+                    <div class="platform-icon">🟠</div>
+                    <h3>Humble Bundle</h3>
+                    <p>Connect your Humble library</p>
+                    <button class="connect-btn">Connect</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="games-section" style="display: none;">
+            <div class="controls">
+                <input type="text" id="search-input" placeholder="Search games..." aria-label="Search games">
+                <div class="filter-bar" id="filter-bar">
+                    <button class="filter-btn active" data-platform="all">All</button>
+                    <button class="filter-btn" data-platform="steam">Steam</button>
+                    <button class="filter-btn" data-platform="epic">Epic</button>
+                    <button class="filter-btn" data-platform="gog">GOG</button>
+                    <button class="filter-btn" data-platform="itch">itch.io</button>
+                    <button class="filter-btn" data-platform="humble">Humble</button>
+                </div>
+                <button id="refresh-btn">Refresh All</button>
+            </div>
+            <div id="game-grid" class="game-grid"></div>
+            <div id="cache-indicator" class="cache-footer">
+                <p>Data updated <span>never</span></p>
+            </div>
+        </section>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
