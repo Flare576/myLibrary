@@ -14,8 +14,8 @@ test('passwordless auth flow', async ({ page }) => {
   // Simulate validation - manually set localStorage or mock API
   // For full test, mock /api/auth/validate response
   await page.evaluate(() => {
-    localStorage.setItem('flare_auth_state', 'validated');
-    localStorage.setItem('flare_user_id', 'test-user');
+    localStorage.setItem('mylibrary_auth_state', 'validated');
+    localStorage.setItem('mylibrary_user_id', 'test-user');
     location.reload();
   });
 

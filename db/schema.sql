@@ -1,8 +1,8 @@
--- Database: flare_db (create via IONOS cPanel)
+-- Database: mylibrary_db (create via IONOS cPanel)
 -- Full schema with indexes for performance
 
-CREATE DATABASE IF NOT EXISTS flare_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE flare_db;
+CREATE DATABASE IF NOT EXISTS mylibrary_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE mylibrary_db;
 
 CREATE TABLE users (
     id CHAR(36) PRIMARY KEY DEFAULT (UUID()),

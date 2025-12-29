@@ -5,7 +5,7 @@
 return [
     'db' => [
         'host' => 'localhost',  // Or IONOS DB host like db123.ionos.com
-        'dbname' => 'flare_db',
+        'dbname' => 'mylibrary_db',
         'user' => 'app_user',   // From IONOS cPanel
         'pass' => 'apppass',    // Secure this
         'charset' => 'utf8mb4'
@@ -20,7 +20,7 @@ return [
         'smtp_user' => 'no-reply@yourdomain.com',
         'smtp_pass' => 'your_smtp_pass',  // Secure
         'from_email' => 'no-reply@yourdomain.com',
-        'from_name' => 'FLARE Game Library'
+        'from_name' => 'MyLibrary Game Library'
     ],
     'apis' => [
         'steam' => [

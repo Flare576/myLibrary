@@ -1,4 +1,4 @@
-// FLARE App - Vanilla JS Implementation
+// MyLibrary App - Vanilla JS Implementation
 // No external libs; uses native fetch, localStorage, DOM
 
 // Helper function to construct API URLs relative to current path
@@ -9,27 +9,27 @@ function getApiUrl(path) {
 
 class AuthStateManager {
   constructor() {
-    this.currentState = localStorage.getItem('flare_auth_state') || 'unauthenticated';
-    this.token = localStorage.getItem('flare_token');
-    this.userId = localStorage.getItem('flare_user_id');
+    this.currentState = localStorage.getItem('mylibrary_auth_state') || 'unauthenticated';
+    this.token = localStorage.getItem('mylibrary_token');
+    this.userId = localStorage.getItem('mylibrary_user_id');
   }
 
   getStoredState() {
-    return localStorage.getItem('flare_auth_state');
+    return localStorage.getItem('mylibrary_auth_state');
   }
 
   setState(newState, data = {}) {
     this.currentState = newState;
-    localStorage.setItem('flare_auth_state', newState);
+    localStorage.setItem('mylibrary_auth_state', newState);
     
     if (data.token) {
       this.token = data.token;
-      localStorage.setItem('flare_token', data.token);
+      localStorage.setItem('mylibrary_token', data.token);
     }
     
     if (data.userId) {
       this.userId = data.userId;
-      localStorage.setItem('flare_user_id', data.userId);
+      localStorage.setItem('mylibrary_user_id', data.userId);
     }
     
     this.updateUI();
@@ -275,7 +275,7 @@ function debounce(func, wait) {
 }
 
 // Main App
-class FLAREApp {
+class MyLibraryApp {
   constructor() {
     this.auth = new AuthStateManager();
     this.platforms = new PlatformManager();
@@ -425,6 +425,6 @@ class FLAREApp {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-  const app = new FLAREApp();
+  const app = new MyLibraryApp();
   app.init();
 });

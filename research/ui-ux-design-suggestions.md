@@ -1,7 +1,7 @@
-# FLARE UI/UX Design Suggestions
+# MyLibrary UI/UX Design Suggestions
 
 ## Overview
-Based on FLARE_IDEA.md requirements, this document provides concrete UI/UX design patterns for an aggregated game library interface with passwordless authentication and multi-platform game display.
+Based on MyLibrary requirements, this document provides concrete UI/UX design patterns for an aggregated game library interface with passwordless authentication and multi-platform game display.
 
 ## Authentication Flow Design
 
@@ -10,7 +10,7 @@ Based on FLARE_IDEA.md requirements, this document provides concrete UI/UX desig
 **Visual States:**
 1. **Unauthenticated State**
    - Clean landing page with email input field
-   - Minimal branding: "FLARE Game Library Aggregator"
+   - Minimal branding: "MyLibrary Game Library Aggregator"
    - Clear CTA: "Enter your email to get started"
    - Loading spinner appears immediately after email submission
 

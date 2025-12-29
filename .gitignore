@@ -6,3 +6,6 @@ php.ini
 deploy
 # Don't commit your local tags file
 tags
+
+# Don't commit logs folder
+logs/

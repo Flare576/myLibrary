@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FLARE Game Library Aggregator</title>
+    <title>MyLibrary Game Library Aggregator</title>
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
     <!-- Unauthenticated State -->
     <div id="unauthenticated" data-auth-state="unauthenticated">
         <div class="auth-container">
-            <h1>Welcome to FLARE</h1>
+            <h1>Welcome to MyLibrary</h1>
             <p>Enter your email to get started with passwordless login.</p>
             <form id="email-form">
                 <input type="email" id="email-input" placeholder="your@email.com" required aria-label="Email address">
@@ -33,7 +33,7 @@
     <!-- Validated State - Dashboard -->
     <div id="dashboard" data-auth-state="validated" style="display: none;">
         <header>
-            <h1>FLARE Dashboard</h1>
+            <h1>MyLibrary Dashboard</h1>
             <div id="user-info"></div>
             <button id="logout-btn">Logout</button>
         </header>

@@ -1,5 +1,5 @@
 ---
-name: "FLARE Game Library Aggregator - Base PRP"
+name: "MyLibrary Game Library Aggregator - Base PRP"
 description: |
   Comprehensive PRP for building a unified game library search website supporting Steam, Epic, GOG, itch.io, and Humble Bundle platforms with passwordless authentication, file-based caching, and vanilla JS frontend.
 
@@ -113,7 +113,7 @@ _If someone knew nothing about this codebase, would they have everything needed 
 
 - file: js/app.js
   why: Main application logic
-  pattern: FLAREApp class initializing managers, DOMContentLoaded
+  pattern: MyLibraryApp class initializing managers, DOMContentLoaded
   gotcha: Vanilla fetch for APIs; debounce search input
 ```
 
@@ -176,11 +176,11 @@ As above:
 Create the core data models for type safety and consistency. Use MySQL schema with UUIDs for distributed scalability.
 
 ```sql
--- Database: flare_db (create via IONOS cPanel)
+-- Database: mylibrary_db (create via IONOS cPanel)
 -- Full schema with indexes for performance
 
-CREATE DATABASE IF NOT EXISTS flare_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE flare_db;
+CREATE DATABASE IF NOT EXISTS mylibrary_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE mylibrary_db;
 
 CREATE TABLE users (
     id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
@@ -287,9 +287,9 @@ Task 8: CREATE index.html
   - PLACEMENT: Root
 
 Task 9: CREATE js/app.js
-  - IMPLEMENT: FLAREApp class: init() with auth.updateUI(), platforms.load(), games.load(); event listeners for forms/buttons
+  - IMPLEMENT: MyLibraryApp class: init() with auth.updateUI(), platforms.load(), games.load(); event listeners for forms/buttons
   - FOLLOW pattern: From component-guide - AuthStateManager.pollForValidation(), PlatformManager.connectPlatform(), GameGrid.render()
-  - NAMING: new FLAREApp().init() on DOMContentLoaded
+  - NAMING: new MyLibraryApp().init() on DOMContentLoaded
   - DEPENDENCIES: index.html
   - PLACEMENT: js/
 
@@ -363,7 +363,7 @@ async connectPlatform(platform) {
 
 ```yaml
 DATABASE:
-  - migration: "CREATE DATABASE flare_db; SOURCE db/schema.sql"
+  - migration: "CREATE DATABASE mylibrary_db; SOURCE db/schema.sql"
   - index: "ALTER TABLE user_accounts ADD INDEX idx_ext_id (ext_id)"
 
 CONFIG:
