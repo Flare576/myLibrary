@@ -1,4 +1,12 @@
 <?php
+// Start session first before any output
+session_start();
+
+// Enable error reporting but don't display errors (log them instead)
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
@@ -7,7 +15,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit(0);
 }
 
+
+
 $config = include __DIR__ . '/../config.php';
+
+// Manual class loading (replace with proper autoloader in production)
+require_once __DIR__ . '/../classes/PasswordlessAuth.php';
+require_once __DIR__ . '/../classes/Cache.php';
 
 try {
     $pdo = new PDO(
@@ -17,11 +31,14 @@ try {
         [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
     );
 
-    $auth = new App\Auth\PasswordlessAuth($pdo, $config['app']['url']);
+    $auth = new App\Auth\PasswordlessAuth($pdo, $config['app']['url'], $config['email'] ?? []);
 
     $input = json_decode(file_get_contents('php://input'), true);
     $method = $_SERVER['REQUEST_METHOD'];
     $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+    
+    // Remove subdirectory from path for routing
+    $path = preg_replace('#^/[^/]+/#', '/', $path);
 
     if ($method === 'POST' && $path === '/api/auth/init') {
         $email = $input['email'] ?? '';
@@ -40,7 +57,6 @@ try {
         $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
         $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
         $userData = $auth->validate($token, $ip, $ua);
-        session_start();
         $_SESSION['user_id'] = $userData['user_id'];
         echo json_encode(['success' => true, 'user' => $userData]);
     } elseif ($method === 'GET' && $path === '/api/auth/poll') {

@@ -17,14 +17,16 @@ class PasswordlessAuth
     private int $tokenExpiryMinutes = 15;
     private int $rateLimitAttempts = 5;
     private int $rateLimitWindowMinutes = 60;
+    private array $emailConfig;
 
-    public function __construct(PDO $pdo, string $appUrl)
+    public function __construct(PDO $pdo, string $appUrl, array $emailConfig = [])
     {
         $this->pdo = $pdo;
         $this->appUrl = rtrim($appUrl, '/');
+        $this->emailConfig = $emailConfig;
     }
 
-    public function init(string $email, string $ip, string $userAgent): int
+    public function init(string $email, string $ip, string $userAgent): string
     {
         $this->enforceRateLimit($email, $ip);
 
@@ -108,19 +110,61 @@ class PasswordlessAuth
 
     private function sendEmail(string $email, string $token): void
     {
-        $subject = 'Your FLARE Login Token';
+        $subject = 'Your MyLibrary Login Token';
         $message = "
-        <h2>Login to FLARE</h2>
-        <p>Click to login: <a href='{$this->appUrl}/api/auth/validate?token={$token}'>Login Link</a></p>
+        <h2>Login to MyLibrary</h2>
+        <p>Click to login: <a href='{$this->appUrl}?token={$token}'>Login Link</a></p>
         <p>Or copy token: {$token}</p>
         <p>Expires in {$this->tokenExpiryMinutes} minutes.</p>
         ";
-        $headers = 'MIME-Version: 1.0' . "\r\n";
-        $headers .= 'Content-type: text/html; charset=UTF-8' . "\r\n";
-        $headers .= 'From: no-reply@flare.com' . "\r\n";
 
-        if (!mail($email, $subject, $message, $headers)) {
-            throw new RuntimeException('Failed to send email');
+        error_log("Attempting to send email to: " . $email);
+
+        // Use SMTP if configured, otherwise fallback to mail()
+        if (!empty($this->emailConfig)) {
+            error_log("Using SMTP configuration");
+            $this->sendSMTPEmail($email, $subject, $message);
+        } else {
+            error_log("Using default mail() function");
+            $headers = 'MIME-Version: 1.0' . "\r\n";
+            $headers .= 'Content-type: text/html; charset=UTF-8' . "\r\n";
+            $headers .= 'From: no-reply@flare576.com' . "\r\n";
+
+            if (!mail($email, $subject, $message, $headers)) {
+                error_log("mail() function failed");
+                throw new RuntimeException('Failed to send email');
+            }
+            error_log("Email sent successfully via mail()");
+        }
+    }
+
+    private function sendSMTPEmail(string $to, string $subject, string $message): void
+    {
+        $fromEmail = $this->emailConfig['from_email'] ?? 'mylibrary@flare576.com';
+        $fromName = $this->emailConfig['from_name'] ?? 'MyLibrary';
+        $smtpHost = $this->emailConfig['smtp_host'] ?? '';
+        $smtpPort = $this->emailConfig['smtp_port'] ?? 587;
+        $smtpUser = $this->emailConfig['smtp_user'] ?? '';
+        $smtpPass = $this->emailConfig['smtp_pass'] ?? '';
+
+        if (empty($smtpHost) || empty($smtpUser) || empty($smtpPass)) {
+            throw new RuntimeException('SMTP configuration incomplete');
+        }
+
+        // Create proper headers for SMTP
+        $headers = [
+            'MIME-Version: 1.0',
+            'Content-Type: text/html; charset=UTF-8',
+            'From: ' . $fromName . ' <' . $fromEmail . '>',
+            'Reply-To: ' . $fromEmail,
+            'X-Mailer: PHP/' . phpversion()
+        ];
+
+        // Use PHP's built-in mail with proper SMTP headers
+        // Note: For full SMTP support, you'd need PHPMailer or similar
+        // This relies on the server's mail configuration
+        if (!mail($to, $subject, $message, implode("\r\n", $headers))) {
+            throw new RuntimeException('Failed to send email via SMTP');
         }
     }
 

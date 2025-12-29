@@ -1,6 +1,12 @@
 // FLARE App - Vanilla JS Implementation
 // No external libs; uses native fetch, localStorage, DOM
 
+// Helper function to construct API URLs relative to current path
+function getApiUrl(path) {
+  const basePath = window.location.pathname.replace(/\/[^\/]*$/, '');
+  return basePath + path;
+}
+
 class AuthStateManager {
   constructor() {
     this.currentState = localStorage.getItem('flare_auth_state') || 'unauthenticated';
@@ -49,7 +55,7 @@ class AuthStateManager {
   async pollForValidation() {
     const pollInterval = setInterval(async () => {
       try {
-        const response = await fetch('/api/auth/poll?sessionId=' + sessionStorage.getItem('sessionId'));
+        const response = await fetch(getApiUrl('/api/auth/poll?sessionId=' + sessionStorage.getItem('sessionId')));
         const data = await response.json();
         
         if (data.authenticated) {
@@ -73,7 +79,7 @@ class PlatformManager {
 
   async loadConnectedPlatforms() {
     try {
-      const response = await fetch('/api/user/platforms');  // Assume endpoint; implement if needed
+      const response = await fetch(getApiUrl('/api/user/platforms'));  // Assume endpoint; implement if needed
       const platforms = await response.json();
       this.connectedPlatforms = new Set(platforms);
       localStorage.setItem('connected_platforms', JSON.stringify(Array.from(this.connectedPlatforms)));
@@ -87,7 +93,7 @@ class PlatformManager {
     this.updatePlatformStatus(platform, 'connecting');
     
     try {
-      const response = await fetch(`/api/connect/${platform}/init`);
+      const response = await fetch(getApiUrl(`/api/connect/${platform}/init`));
       const { authUrl } = await response.json();
       
       const authWindow = window.open(authUrl, `${platform}_auth`, 'width=600,height=700');
@@ -105,7 +111,7 @@ class PlatformManager {
         clearInterval(pollInterval);
         
         try {
-          const response = await fetch(`/api/connect/${platform}/complete`);
+          const response = await fetch(getApiUrl(`/api/connect/${platform}/complete`));
           if (response.ok) {
             const data = await response.json();
             if (data.success) {
@@ -160,7 +166,7 @@ class GameGrid {
 
   async loadGames() {
     try {
-      const response = await fetch('/api/games/all');  // Aggregate endpoint; implement in backend if needed
+      const response = await fetch(getApiUrl('/api/games/all'));  // Aggregate endpoint; implement in backend if needed
       const data = await response.json();
       this.games = data.games || [];
       this.filteredGames = [...this.games];
@@ -277,6 +283,9 @@ class FLAREApp {
   }
 
   async init() {
+    // Check for token in URL first
+    await this.handleUrlToken();
+    
     this.auth.updateUI();
     
     if (this.auth.currentState === 'validated') {
@@ -285,6 +294,38 @@ class FLAREApp {
     }
     
     this.setupEventListeners();
+  }
+
+  async handleUrlToken() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    
+    if (token) {
+      try {
+        const response = await fetch(getApiUrl('/api/auth/validate'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            this.auth.setState('validated', {
+              token: data.user.id,
+              userId: data.user.id
+            });
+            // Clean up URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+            return;
+          }
+        }
+        showError('Invalid or expired token');
+      } catch (error) {
+        showError('Token validation failed');
+        console.error('Validation error:', error);
+      }
+    }
   }
 
   setupEventListeners() {
@@ -297,7 +338,7 @@ class FLAREApp {
         if (!email) return;
         
         try {
-          const response = await fetch('/api/auth/init', {
+          const response = await fetch(getApiUrl('/api/auth/init'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email })
@@ -351,7 +392,7 @@ class FLAREApp {
     if (refreshBtn) {
       refreshBtn.addEventListener('click', async () => {
         try {
-          const response = await fetch('/api/games/refresh', { method: 'POST' });
+          const response = await fetch(getApiUrl('/api/games/refresh'), { method: 'POST' });
           if (response.ok) {
             await this.games.loadGames();
           }
