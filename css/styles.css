@@ -321,6 +321,16 @@ header {
   border-top: 1px solid #e5e7eb;
 }
 
+.cache-footer .fresh {
+  color: var(--success);
+  font-weight: 500;
+}
+
+.cache-footer .cached {
+  color: var(--text-secondary);
+  font-size: 0.875em;
+}
+
 .error-toast {
   position: fixed;
   top: 1rem;

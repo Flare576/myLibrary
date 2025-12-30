@@ -30,6 +30,10 @@ try {
     $cache = new Cache($config['app']['cache_dir'], 300);  // 5 min TTL
 
     $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+    
+    // Remove subdirectory from path for routing (same as auth.php)
+    $path = preg_replace('#^/[^/]+/#', '/', $path);
+    
     $parts = explode('/', trim($path, '/'));
     if (count($parts) < 3 || $parts[0] !== 'api' || $parts[1] !== 'games') {
         http_response_code(404);
@@ -37,41 +41,136 @@ try {
         exit;
     }
 
-    $platform = $parts[2];
+    $platform = $parts[2]; // Could be 'all' or a specific platform
     $method = $_SERVER['REQUEST_METHOD'];
 
-    // Get ext_id
-    $stmt = $pdo->prepare('SELECT ext_id FROM user_accounts WHERE user_id = ? AND ext_system = ?');
-    $stmt->execute([$userId, $platform]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$row || empty($row['ext_id'])) {
-        http_response_code(400);
-        echo json_encode(['error' => 'Platform not connected']);
-        exit;
-    }
-    $extId = $row['ext_id'];
-
-    $key = "{$userId}_{$platform}";
-
-    if ($method === 'GET') {
-        $games = $cache->get($key);
-        if ($games === null) {
-            $games = $this->fetchFromPlatform($platform, $extId, $config);
-            $cache->set($key, $games);
+    if ($platform === 'all') {
+        // Handle aggregation for all platforms
+        if ($method === 'GET') {
+            $result = fetchAllPlatforms($pdo, $cache, $userId, $config);
+            echo json_encode($result);
+        } elseif ($method === 'POST') {
+            $result = refreshAllPlatforms($pdo, $cache, $userId, $config);
+            echo json_encode($result);
+        } else {
+            http_response_code(405);
+            echo json_encode(['error' => 'Method not allowed']);
         }
-        echo json_encode(['success' => true, 'games' => $games, 'cached' => true]);
-    } elseif ($method === 'POST' && $path === '/api/games/refresh') {
-        $cache->delete($key);
-        $games = $this->fetchFromPlatform($platform, $extId, $config);
-        $cache->set($key, $games);
-        echo json_encode(['success' => true, 'games' => $games, 'refreshed' => true]);
     } else {
-        http_response_code(405);
-        echo json_encode(['error' => 'Method not allowed']);
+        // Handle individual platform (existing functionality)
+        $stmt = $pdo->prepare('SELECT ext_id FROM user_accounts WHERE user_id = ? AND ext_system = ?');
+        $stmt->execute([$userId, $platform]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row || empty($row['ext_id'])) {
+            echo json_encode(['status' => 404, 'errorMessage' => 'Platform not connected']);
+            exit;
+        }
+        $extId = $row['ext_id'];
+
+        $key = "{$userId}_{$platform}";
+
+        if ($method === 'GET') {
+            $games = $cache->get($key);
+            $cached = true;
+            if ($games === null) {
+                $games = fetchFromPlatform($platform, $extId, $config);
+                $cache->set($key, $games);
+                $cached = false;
+            }
+            echo json_encode(['status' => 200, 'games' => $games, 'cached' => $cached]);
+        } elseif ($method === 'POST') {
+            $cache->delete($key);
+            $games = fetchFromPlatform($platform, $extId, $config);
+            $cache->set($key, $games);
+            echo json_encode(['status' => 200, 'games' => $games, 'refreshed' => true]);
+        } else {
+            http_response_code(405);
+            echo json_encode(['error' => 'Method not allowed']);
+        }
     }
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(['error' => $e->getMessage()]);
+}
+
+function fetchAllPlatforms(PDO $pdo, Cache $cache, string $userId, array $config): array
+{
+    // Get all connected platforms for user
+    $stmt = $pdo->prepare('SELECT ext_system, ext_id FROM user_accounts WHERE user_id = ?');
+    $stmt->execute([$userId]);
+    $connectedPlatforms = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    $platformMap = [];
+    foreach ($connectedPlatforms as $platform) {
+        $platformMap[$platform['ext_system']] = $platform['ext_id'];
+    }
+    
+    $supportedPlatforms = ['steam', 'epic', 'itch', 'gog', 'humble'];
+    $result = [];
+    
+    foreach ($supportedPlatforms as $platform) {
+        if (isset($platformMap[$platform])) {
+            // Platform is connected, fetch games
+            $key = "{$userId}_{$platform}";
+            $games = $cache->get($key);
+            $cached = true;
+            
+            if ($games === null) {
+                try {
+                    $games = fetchFromPlatform($platform, $platformMap[$platform], $config);
+                    $cache->set($key, $games);
+                    $cached = false;
+                    $result[$platform] = ['status' => 200, 'games' => $games, 'cached' => $cached];
+                } catch (Exception $e) {
+                    $result[$platform] = ['status' => 500, 'errorMessage' => 'Failed to fetch games: ' . $e->getMessage()];
+                }
+            } else {
+                $result[$platform] = ['status' => 200, 'games' => $games, 'cached' => $cached];
+            }
+        } else {
+            // Platform not connected
+            $result[$platform] = ['status' => 404, 'errorMessage' => 'Platform not connected'];
+        }
+    }
+    
+    return $result;
+}
+
+function refreshAllPlatforms(PDO $pdo, Cache $cache, string $userId, array $config): array
+{
+    // Get all connected platforms for user
+    $stmt = $pdo->prepare('SELECT ext_system, ext_id FROM user_accounts WHERE user_id = ?');
+    $stmt->execute([$userId]);
+    $connectedPlatforms = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    $platformMap = [];
+    foreach ($connectedPlatforms as $platform) {
+        $platformMap[$platform['ext_system']] = $platform['ext_id'];
+    }
+    
+    $supportedPlatforms = ['steam', 'epic', 'itch', 'gog', 'humble'];
+    $result = [];
+    
+    foreach ($supportedPlatforms as $platform) {
+        if (isset($platformMap[$platform])) {
+            // Platform is connected, clear cache and fetch fresh data
+            $key = "{$userId}_{$platform}";
+            $cache->delete($key);
+            
+            try {
+                $games = fetchFromPlatform($platform, $platformMap[$platform], $config);
+                $cache->set($key, $games);
+                $result[$platform] = ['status' => 200, 'games' => $games, 'refreshed' => true];
+            } catch (Exception $e) {
+                $result[$platform] = ['status' => 500, 'errorMessage' => 'Failed to refresh games: ' . $e->getMessage()];
+            }
+        } else {
+            // Platform not connected
+            $result[$platform] = ['status' => 404, 'errorMessage' => 'Platform not connected'];
+        }
+    }
+    
+    return $result;
 }
 
 function fetchFromPlatform(string $platform, string $extId, array $config): array

@@ -13,10 +13,23 @@ export class GameGrid {
     try {
       const response = await ApiClient.get('games/all');
       const data = await response.json();
-      this.games = data.games || [];
+      
+      // Extract games from all platforms
+      this.games = [];
+      for (const [platform, platformData] of Object.entries(data)) {
+        if (platformData.status === 200 && platformData.games) {
+          // Add platform info to each game
+          const gamesWithPlatform = platformData.games.map(game => ({
+            ...game,
+            platform: platform
+          }));
+          this.games.push(...gamesWithPlatform);
+        }
+      }
+      
       this.filteredGames = [...this.games];
       this.render();
-      this.updateCacheIndicator();
+      this.updateCacheIndicator(data);
     } catch (error) {
       console.error('Failed to load games:', error);
       this.showError('Failed to load games');
@@ -82,10 +95,34 @@ export class GameGrid {
     return card;
   }
 
-  updateCacheIndicator() {
-    // Placeholder - fetch from backend or local
+  updateCacheIndicator(data = null) {
     const indicator = document.getElementById('cache-indicator');
-    if (indicator) {
+    if (!indicator) return;
+    
+    if (data) {
+      // Count cached vs fresh data
+      let cachedCount = 0;
+      let freshCount = 0;
+      
+      for (const [platform, platformData] of Object.entries(data)) {
+        if (platformData.status === 200) {
+          if (platformData.cached || platformData.refreshed) {
+            freshCount++;
+          } else {
+            cachedCount++;
+          }
+        }
+      }
+      
+      let cacheText = 'Data updated';
+      if (freshCount > 0) {
+        cacheText += ` <span class="fresh">just now</span>`;
+      } else if (cachedCount > 0) {
+        cacheText += ' <span class="cached">from cache</span>';
+      }
+      
+      indicator.innerHTML = `<p>${cacheText}</p>`;
+    } else {
       indicator.innerHTML = '<p>Data updated <span>5 minutes ago</span></p>';
     }
   }
