@@ -43,5 +43,17 @@ CREATE TABLE user_tokens (
     INDEX idx_ip_created (ip_address, created_at)
 ) ENGINE=InnoDB;
 
+CREATE TABLE rate_limits (
+    id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    user_id CHAR(36) NOT NULL,
+    platform VARCHAR(20) NOT NULL,
+    request_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_platform (user_id, platform),
+    INDEX idx_timestamp (request_timestamp),
+    UNIQUE KEY unique_user_platform_time (user_id, platform, request_timestamp)
+) ENGINE=InnoDB;
+
 -- Initial data or triggers if needed
 -- Cron alternative: Manual cleanup query: DELETE FROM user_tokens WHERE expires_at < NOW();
+-- Cleanup old rate limit entries: DELETE FROM rate_limits WHERE request_timestamp < DATE_SUB(NOW(), INTERVAL 1 HOUR);
