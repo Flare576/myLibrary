@@ -9,3 +9,6 @@ tags
 
 # Don't commit logs folder
 logs/
+
+# Don't commit our "ticket" system
+tickets/
