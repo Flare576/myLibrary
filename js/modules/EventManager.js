@@ -41,11 +41,7 @@ export class EventManager {
       });
     }
 
-    // Refresh button
-    const refreshBtn = document.getElementById('refresh-btn');
-    if (refreshBtn) {
-      refreshBtn.addEventListener('click', this.handleRefresh.bind(this));
-    }
+
 
     // Logout button
     const logoutBtn = document.getElementById('logout-btn');
@@ -109,16 +105,7 @@ export class EventManager {
     this.gameGrid.filterByPlatform(platform);
   }
 
-  async handleRefresh() {
-    try {
-      const response = await ApiClient.post('games/refresh', {});
-      if (response.ok) {
-        await this.gameGrid.loadGames();
-      }
-    } catch (error) {
-      this.showError('Refresh failed');
-    }
-  }
+
 
   handleLogout() {
     this.appState.clear();

@@ -7,6 +7,7 @@ export class GameGrid {
     this.filteredGames = [];
     this.currentFilter = 'all';
     this.searchQuery = '';
+    this.onPlatformStatusUpdate = null;
   }
 
   async loadGames() {
@@ -30,6 +31,9 @@ export class GameGrid {
       this.filteredGames = [...this.games];
       this.render();
       this.updateCacheIndicator(data);
+      
+      // Emit platform status update for other components
+      this.onPlatformStatusUpdate?.(data);
     } catch (error) {
       console.error('Failed to load games:', error);
       this.showError('Failed to load games');
@@ -103,13 +107,19 @@ export class GameGrid {
       // Count cached vs fresh data
       let cachedCount = 0;
       let freshCount = 0;
+      let lastRefresh = null;
       
       for (const [platform, platformData] of Object.entries(data)) {
         if (platformData.status === 200) {
-          if (platformData.cached || platformData.refreshed) {
+          if (platformData.refreshed) {
             freshCount++;
           } else {
             cachedCount++;
+          }
+          
+          // Track the most recent refresh timestamp
+          if (platformData.lastRefresh && (!lastRefresh || new Date(platformData.lastRefresh) > new Date(lastRefresh))) {
+            lastRefresh = platformData.lastRefresh;
           }
         }
       }
@@ -121,9 +131,18 @@ export class GameGrid {
         cacheText += ' <span class="cached">from cache</span>';
       }
       
+      if (lastRefresh) {
+        const refreshDate = new Date(lastRefresh);
+        const now = new Date();
+        const diffMinutes = Math.floor((now - refreshDate) / 60000);
+        if (diffMinutes > 0) {
+          cacheText += ` (${diffMinutes}m ago)`;
+        }
+      }
+      
       indicator.innerHTML = `<p>${cacheText}</p>`;
     } else {
-      indicator.innerHTML = '<p>Data updated <span>5 minutes ago</span></p>';
+      indicator.innerHTML = '<p>Data updated <span>never</span></p>';
     }
   }
 

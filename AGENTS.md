@@ -20,6 +20,11 @@ MyLibrary is a web-based game library aggregator that allows users to connect mu
 - `db/schema.sql` - MySQL database schema
 - `deploy` - Deployment script using lftp
 
+### Local-Only Files
+- `tickets/*` - NEVER add/commit these files - they can contain sensitive information (like API keys)
+- `logs/` - NEVER add/commit these files - they can be logs from production systems, copied locally for analysis
+- `config.php` - NEVER add/commit this file - it holds all the secrets/config from our system
+
 ### Environment Variables Required
 ```
 MYLIB_FTP_HOST=host.domain.com

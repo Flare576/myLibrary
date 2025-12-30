@@ -17,6 +17,11 @@ class MyLibraryApp {
     this.oauthHandler = new OAuthHandler(this.platformManager);
     this.eventManager = new EventManager(this.appState, this.platformManager, this.gameGrid, this.oauthHandler);
     
+    // Connect GameGrid and PlatformManager
+    this.gameGrid.onPlatformStatusUpdate = (platformData) => {
+      this.platformManager.updatePlatformStatusesFromGames(platformData);
+    };
+    
     // Setup state subscribers
     this.setupStateSubscribers();
   }
