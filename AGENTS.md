@@ -45,14 +45,16 @@ MYLIB_LOCAL_DIR=.
 - PHP code follows PSR-style conventions
 
 ### Deployment
-Run the deployment script:
+**IMPORTANT**: During development, use `./deploy` without arguments to upload changes without committing.
+
 ```bash
-./deploy -m "commit message"
+./deploy                    # Upload changes only (development)
+./deploy -m "commit message" # Upload + commit changes (when ready)
 ```
 Options:
-- `-n` for dry run
 - `-p` to post to BlueSky afterward
-- `-m` to commit with message
+- `-m` to commit with message (ONLY use when functionality is confirmed working)
+- `-n` for dry run (currently a no-op for this script)
 
 ## Platform Integration Status
 
@@ -110,6 +112,9 @@ EOF
 
 ### Available Log Files
 - `logs/php-errors.log` - PHP error logs from production server
+
+### PHP Configuration Requirements
+**IMPORTANT**: For PHP error logging to work, there MUST be a `php.ini` file in the SAME folder as the `.php` file. PHP configuration is NOT hierarchical on IONOS hosting - each subdirectory needs its own `php.ini` copy.
 
 ### Environment Variables Required
 Ensure these are set in your environment:
