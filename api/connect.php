@@ -37,7 +37,14 @@ try {
     $action = $parts[3];  // init or complete
 
     if ($action === 'init') {
-        $redirectUri = $config['app']['url'] . '/api/connect/' . $platform . '/complete';
+        // Set callback URL based on platform - unified callback system
+        $callbackPages = [
+            'steam' => 'callback.html',
+            'epic' => 'callback.html', 
+            'itch' => 'callback.html'
+        ];
+        $callbackPage = $callbackPages[$platform] ?? 'callback.html';
+        $redirectUri = rtrim($config['app']['url'], '/') . '/' . $callbackPage;
         switch ($platform) {
             case 'steam':
                 // Generate nonce
@@ -45,16 +52,16 @@ try {
                 $stmt = $pdo->prepare('INSERT INTO user_accounts (user_id, ext_system, nonce) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE nonce = ?');
                 $stmt->execute([$userId, 'steam', $nonce, $nonce]);
                 $authUrl = 'https://steamcommunity.com/openid/login?' . http_build_query([
-                    'openid.claimed_id' => 'http://steamcommunity.com/openid/id/76561197960265728',
-                    'openid.identity' => 'http://steamcommunity.com/openid/id/76561197960265728',
+                    'openid.claimed_id' => 'http://specs.openid.net/auth/2.0/identifier_select',
+                    'openid.identity' => 'http://specs.openid.net/auth/2.0/identifier_select',
                     'openid.mode' => 'checkid_setup',
                     'openid.ns' => 'http://specs.openid.net/auth/2.0',
                     'openid.ns.sreg' => 'http://openid.net/extensions/sreg/1.1',
                     'openid.ns.ui' => 'http://specs.openid.net/auth/2.0/identifier_select',
-                    'openid.return_to' => $redirectUri . '?nonce=' . $nonce,
+'openid.return_to' => $redirectUri . '?nonce=' . $nonce,
                     'openid.realm' => $config['app']['url']
                 ]);
-                header('Location: ' . $authUrl);
+                echo json_encode(['authUrl' => $authUrl]);
                 exit;
             case 'epic':
                 $authUrl = 'https://www.epicgames.com/id/authorize?' . http_build_query([
@@ -63,7 +70,7 @@ try {
                     'redirect_uri' => $redirectUri,
                     'scope' => 'basicProfile account entitlements'
                 ]);
-                header('Location: ' . $authUrl);
+                echo json_encode(['authUrl' => $authUrl]);
                 exit;
             case 'itch':
                 $state = bin2hex(random_bytes(32));
@@ -74,7 +81,7 @@ try {
                     'redirect_uri' => $redirectUri,
                     'state' => $state
                 ]);
-                header('Location: ' . $authUrl);
+                echo json_encode(['authUrl' => $authUrl]);
                 exit;
             case 'gog':
                 // Placeholder: No public API; manual or skip
@@ -89,29 +96,41 @@ try {
                 echo json_encode(['error' => 'Unsupported platform']);
         }
     } elseif ($action === 'complete') {
+        // Get input data from POST body or GET fallback
+        $input = json_decode(file_get_contents('php://input'), true) ?: $_GET;
+        
         switch ($platform) {
             case 'steam':
-                // Basic OpenID verify (full impl needs library; here extract SteamID)
-                $claimedId = $_GET['openid.claimed_id'] ?? '';
-                if (strpos($claimedId, 'http://steamcommunity.com/openid/id/') === 0) {
-                    $extId = substr($claimedId, strlen('http://steamcommunity.com/openid/id/'));
-                    $nonce = $_GET['nonce'] ?? '';
-                    // Verify nonce
-                    $stmt = $pdo->prepare('SELECT id FROM user_accounts WHERE user_id = ? AND ext_system = ? AND nonce = ?');
-                    $stmt->execute([$userId, 'steam', $nonce]);
-                    if ($stmt->fetch()) {
-                        $updateStmt = $pdo->prepare('UPDATE user_accounts SET ext_id = ?, nonce = NULL WHERE user_id = ? AND ext_system = ?');
-                        $updateStmt->execute([$extId, $userId, 'steam']);
-                        echo json_encode(['success' => true, 'platform' => 'steam', 'ext_id' => $extId]);
-                    } else {
-                        throw new InvalidArgumentException('Invalid nonce');
-                    }
+                // Handle Steam callback - extract SteamID and complete connection
+                $claimedId = $input['claimedId'] ?? '';
+                $nonce = $input['nonce'] ?? '';
+                
+                if (empty($claimedId) || empty($nonce)) {
+                    throw new InvalidArgumentException('Missing required Steam parameters');
+                }
+
+                if (!str_contains($claimedId, 'steamcommunity.com/openid/id/')) {
+                    throw new InvalidArgumentException('Invalid Steam claimed_id format');
+                }
+
+                // Extract SteamID from claimed_id
+                $extId = basename($claimedId);
+                
+                // Verify nonce and store connection
+                $stmt = $pdo->prepare('SELECT id FROM user_accounts WHERE user_id = ? AND ext_system = ? AND nonce = ?');
+                $stmt->execute([$userId, 'steam', $nonce]);
+                
+                if ($stmt->fetch()) {
+                    $updateStmt = $pdo->prepare('UPDATE user_accounts SET ext_id = ?, nonce = NULL WHERE user_id = ? AND ext_system = ?');
+                    $updateStmt->execute([$extId, $userId, 'steam']);
+                    
+                    echo json_encode(['success' => true, 'platform' => 'steam', 'ext_id' => $extId]);
                 } else {
-                    throw new InvalidArgumentException('Invalid Steam response');
+                    throw new InvalidArgumentException('Invalid nonce');
                 }
                 break;
             case 'epic':
-                $code = $_GET['code'] ?? '';
+                $code = $input['code'] ?? '';
                 if (empty($code)) {
                     throw new InvalidArgumentException('No code provided');
                 }
@@ -146,8 +165,8 @@ try {
                 }
                 break;
             case 'itch':
-                $token = $_GET['access_token'] ?? '';
-                $state = $_GET['state'] ?? '';
+                $token = $input['access_token'] ?? '';
+                $state = $input['state'] ?? '';
                 if ($_SESSION['oauth_state'] !== $state) {
                     throw new InvalidArgumentException('Invalid state');
                 }
