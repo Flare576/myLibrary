@@ -100,6 +100,41 @@ header {
   border-bottom: 1px solid #e5e7eb;
 }
 
+.header-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+#nuke-btn {
+  background: var(--error);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+#nuke-btn:hover {
+  background: #dc2626;
+}
+
+#logout-btn {
+  background: var(--text-secondary);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+#logout-btn:hover {
+  background: #4b5563;
+}
+
 #platforms-grid, .platform-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

@@ -49,6 +49,12 @@ export class EventManager {
       logoutBtn.addEventListener('click', this.handleLogout.bind(this));
     }
 
+    // Nuke button
+    const nukeBtn = document.getElementById('nuke-btn');
+    if (nukeBtn) {
+      nukeBtn.addEventListener('click', this.handleNuke.bind(this));
+    }
+
     // Resend button
     const resendBtn = document.getElementById('resend-btn');
     if (resendBtn) {
@@ -110,6 +116,49 @@ export class EventManager {
   handleLogout() {
     this.appState.clear();
     location.reload();
+  }
+
+  async handleNuke() {
+    if (!confirm('⚠️ WARNING: This will completely destroy your Steam connection, cached games, and all data. Are you absolutely sure you want to nuke everything?')) {
+      return;
+    }
+
+    if (!confirm('Last chance! This action cannot be undone. All your Steam games, tokens, and connection data will be permanently deleted. Continue?')) {
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('platform', 'steam');
+      formData.append('reset_all', 'false'); // Only reset platform data, not entire user
+
+      const response = await fetch('api/debug/reset.php', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        this.showError('✅ ' + data.message, 3000);
+        
+        // Clear all browser storage
+        localStorage.clear();
+        sessionStorage.clear();
+        
+        // Clear app state
+        this.appState.clear();
+        
+        // Reload page after a short delay
+        setTimeout(() => {
+          location.reload();
+        }, 1500);
+      } else {
+        const errorData = await response.json();
+        this.showError('❌ Failed to nuke: ' + errorData.error);
+      }
+    } catch (error) {
+      this.showError('❌ Nuke failed: ' + error.message);
+    }
   }
 
   handleResend() {
