@@ -43,6 +43,35 @@ class GamesManager
     }
 
     /**
+     * Get last refresh timestamp for a specific platform
+     */
+    public function getLastRefresh(string $userId, string $platform): string
+    {
+        $key = "{$userId}_{$platform}_timestamp";
+        $data = $this->cache->get($key);
+        return $data['lastRefresh'] ?? '1970-01-01T00:00:00Z';
+    }
+
+    /**
+     * Set last refresh timestamp for a specific platform
+     */
+    public function setLastRefresh(string $userId, string $platform): void
+    {
+        $key = "{$userId}_{$platform}_timestamp";
+        $data = ['lastRefresh' => gmdate('Y-m-d\TH:i:s\Z')];
+        $this->cache->set($key, $data, 86400 * 365); // Same TTL as game data
+    }
+
+    /**
+     * Clear last refresh timestamp for a specific platform
+     */
+    public function clearLastRefresh(string $userId, string $platform): void
+    {
+        $key = "{$userId}_{$platform}_timestamp";
+        $this->cache->delete($key);
+    }
+
+    /**
      * Check if user is rate limited for platform
      */
     public function checkRateLimit(string $userId, string $platform): ?array
@@ -148,11 +177,17 @@ class GamesManager
             $this->clearCachedGames($userId, $platform);
             $games = $this->fetchFromPlatform($platform, $extId);
             $this->setCachedGames($userId, $platform, $games);
+            $this->setLastRefresh($userId, $platform);
             
             // Record this request for rate limiting
             $this->recordRefreshRequest($userId, $platform);
             
-            return ['status' => 200, 'games' => $games, 'refreshed' => true];
+            return [
+                'status' => 200, 
+                'games' => $games, 
+                'refreshed' => true,
+                'lastRefresh' => $this->getLastRefresh($userId, $platform)
+            ];
         } catch (Exception $e) {
             return ['status' => 500, 'errorMessage' => 'Failed to refresh games: ' . $e->getMessage()];
         }
@@ -185,7 +220,12 @@ class GamesManager
                     // If no cached data, indicate need for refresh
                     $result[$platform] = ['status' => 404, 'errorMessage' => 'No cached data. Please use POST /api/games/refresh/' . $platform . ' to fetch fresh data.'];
                 } else {
-                    $result[$platform] = ['status' => 200, 'games' => $games, 'cached' => true];
+                    $result[$platform] = [
+                        'status' => 200, 
+                        'games' => $games, 
+                        'cached' => true,
+                        'lastRefresh' => $this->getLastRefresh($userId, $platform)
+                    ];
                 }
             } else {
                 // Platform not connected
@@ -227,11 +267,17 @@ class GamesManager
                 try {
                     $games = $this->fetchFromPlatform($platform, $platformMap[$platform]);
                     $this->setCachedGames($userId, $platform, $games);
+                    $this->setLastRefresh($userId, $platform);
                     
                     // Record this request for rate limiting
                     $this->recordRefreshRequest($userId, $platform);
                     
-                    $result[$platform] = ['status' => 200, 'games' => $games, 'refreshed' => true];
+                    $result[$platform] = [
+                        'status' => 200, 
+                        'games' => $games, 
+                        'refreshed' => true,
+                        'lastRefresh' => $this->getLastRefresh($userId, $platform)
+                    ];
                 } catch (Exception $e) {
                     $result[$platform] = ['status' => 500, 'errorMessage' => 'Failed to refresh games: ' . $e->getMessage()];
                 }
@@ -259,6 +305,7 @@ class GamesManager
         $this->clearCachedGames($userId, $platform);
         $games = $this->fetchFromPlatform($platform, $extId);
         $this->setCachedGames($userId, $platform, $games);
+        $this->setLastRefresh($userId, $platform);
         
         // Record this request for rate limiting
         $this->recordRefreshRequest($userId, $platform);

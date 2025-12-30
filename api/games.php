@@ -90,7 +90,12 @@ try {
                 echo json_encode(['status' => 404, 'errorMessage' => 'No cached data. Please use POST /api/games/refresh/' . $platform . ' to fetch fresh data.']);
                 exit;
             }
-            echo json_encode(['status' => 200, 'games' => $games, 'cached' => true]);
+            echo json_encode([
+                'status' => 200, 
+                'games' => $games, 
+                'cached' => true,
+                'lastRefresh' => $gamesManager->getLastRefresh($userId, $platform)
+            ]);
         } else {
             http_response_code(405);
             echo json_encode(['error' => 'Method not allowed. Use GET /api/games/' . $platform . ' for cached data or POST /api/games/refresh/' . $platform . ' to refresh.']);
