@@ -9,6 +9,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit(0);
 }
 
+require_once __DIR__ . '/../classes/Cache.php';
+require_once __DIR__ . '/../classes/GamesManager.php';
+
 $config = include __DIR__ . '/../config.php';
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
@@ -24,6 +27,9 @@ try {
         $config['db']['pass'],
         [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
     );
+    
+    $cache = new Cache($config['app']['cache_dir'], 86400 * 365);
+    $gamesManager = new GamesManager($pdo, $cache, $config);
 
     $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
     $parts = explode('/', trim($path, '/'));
@@ -116,17 +122,46 @@ try {
                 // Extract SteamID from claimed_id
                 $extId = basename($claimedId);
                 
-                // Verify nonce and store connection
-                $stmt = $pdo->prepare('SELECT id FROM user_accounts WHERE user_id = ? AND ext_system = ? AND nonce = ?');
-                $stmt->execute([$userId, 'steam', $nonce]);
+                // Start transaction for atomic connection + games fetch
+                $pdo->beginTransaction();
                 
-                if ($stmt->fetch()) {
+                try {
+                    // Verify nonce and store connection
+                    $stmt = $pdo->prepare('SELECT id FROM user_accounts WHERE user_id = ? AND ext_system = ? AND nonce = ?');
+                    $stmt->execute([$userId, 'steam', $nonce]);
+                    
+                    if (!$stmt->fetch()) {
+                        throw new InvalidArgumentException('Invalid nonce');
+                    }
+                    
+                    // Update connection with external ID
                     $updateStmt = $pdo->prepare('UPDATE user_accounts SET ext_id = ?, nonce = NULL WHERE user_id = ? AND ext_system = ?');
                     $updateStmt->execute([$extId, $userId, 'steam']);
                     
-                    echo json_encode(['success' => true, 'platform' => 'steam', 'ext_id' => $extId]);
-                } else {
-                    throw new InvalidArgumentException('Invalid nonce');
+                    // Auto-fetch games using GamesManager
+                    $games = $gamesManager->autoFetchGames($userId, 'steam', $extId);
+                    
+                    // Commit transaction
+                    $pdo->commit();
+                    
+                    echo json_encode(['success' => true, 'platform' => 'steam', 'ext_id' => $extId, 'games' => $games, 'gamesCount' => count($games)]);
+                } catch (Exception $e) {
+                    // Rollback connection if games fetch fails
+                    $pdo->rollback();
+                    
+                    // Clean up partial connection
+                    $cleanupStmt = $pdo->prepare('UPDATE user_accounts SET ext_id = NULL WHERE user_id = ? AND ext_system = ?');
+                    $cleanupStmt->execute([$userId, 'steam']);
+                    
+                    // Return appropriate error response
+                    if (str_contains($e->getMessage(), 'Please wait')) {
+                        http_response_code(429);
+                        echo json_encode(['status' => 429, 'errorMessage' => $e->getMessage()]);
+                    } else {
+                        http_response_code(500);
+                        echo json_encode(['status' => 500, 'errorMessage' => 'Connection successful but failed to fetch games list. Please try connecting again.']);
+                    }
+                    exit;
                 }
                 break;
             case 'epic':
@@ -134,34 +169,74 @@ try {
                 if (empty($code)) {
                     throw new InvalidArgumentException('No code provided');
                 }
-                $tokenUrl = 'https://www.epicgames.com/id/api/epic/token';
-                $data = http_build_query([
-                    'grant_type' => 'authorization_code',
-                    'client_id' => $config['apis']['epic']['client_id'],
-                    'client_secret' => $config['apis']['epic']['client_secret'],
-                    'redirect_uri' => $config['app']['url'] . '/api/connect/epic/complete',
-                    'code' => $code
-                ]);
-                $ch = curl_init($tokenUrl);
-                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch, CURLOPT_POST, true);
-                curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
-                curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/x-www-form-urlencoded']);
-                $response = curl_exec($ch);
-                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                curl_close($ch);
-                if ($httpCode === 200) {
+                
+                // Start transaction for atomic connection + games fetch
+                $pdo->beginTransaction();
+                
+                try {
+                    $tokenUrl = 'https://www.epicgames.com/id/api/epic/token';
+                    $data = http_build_query([
+                        'grant_type' => 'authorization_code',
+                        'client_id' => $config['apis']['epic']['client_id'],
+                        'client_secret' => $config['apis']['epic']['client_secret'],
+                        'redirect_uri' => $config['app']['url'] . '/api/connect/epic/complete',
+                        'code' => $code
+                    ]);
+                    $ch = curl_init($tokenUrl);
+                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($ch, CURLOPT_POST, true);
+                    curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+                    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/x-www-form-urlencoded']);
+                    $response = curl_exec($ch);
+                    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                    curl_close($ch);
+                    
+                    if ($httpCode !== 200) {
+                        throw new InvalidArgumentException('Token exchange failed: ' . $response);
+                    }
+                    
                     $tokens = json_decode($response, true);
                     $extId = $tokens['account_id'] ?? '';
-                    if ($extId) {
-                        $stmt = $pdo->prepare('INSERT INTO user_accounts (user_id, ext_system, ext_id) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE ext_id = ?');
-                        $stmt->execute([$userId, 'epic', $extId, $extId]);
-                        echo json_encode(['success' => true, 'platform' => 'epic', 'ext_id' => $extId]);
-                    } else {
+                    $accessToken = $tokens['access_token'] ?? '';
+                    if (!$extId) {
                         throw new InvalidArgumentException('No account ID in response');
                     }
-                } else {
-                    throw new InvalidArgumentException('Token exchange failed: ' . $response);
+                    
+                    // Store connection
+                    $stmt = $pdo->prepare('INSERT INTO user_accounts (user_id, ext_system, ext_id) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE ext_id = ?');
+                    $stmt->execute([$userId, 'epic', $extId, $extId]);
+                    
+                    // Store access token temporarily for games fetch
+                    $_SESSION['temp_epic_token'] = $accessToken;
+                    
+                    // Auto-fetch games using GamesManager
+                    $games = $gamesManager->autoFetchGames($userId, 'epic', $extId);
+                    
+                    // Clean up temporary token
+                    unset($_SESSION['temp_epic_token']);
+                    
+                    // Commit transaction
+                    $pdo->commit();
+                    
+                    echo json_encode(['success' => true, 'platform' => 'epic', 'ext_id' => $extId, 'games' => $games, 'gamesCount' => count($games)]);
+                } catch (Exception $e) {
+                    // Rollback connection if games fetch fails
+                    $pdo->rollback();
+                    
+                    // Clean up partial connection and temp token
+                    unset($_SESSION['temp_epic_token']);
+                    $cleanupStmt = $pdo->prepare('DELETE FROM user_accounts WHERE user_id = ? AND ext_system = ?');
+                    $cleanupStmt->execute([$userId, 'epic']);
+                    
+                    // Return appropriate error response
+                    if (str_contains($e->getMessage(), 'Please wait')) {
+                        http_response_code(429);
+                        echo json_encode(['status' => 429, 'errorMessage' => $e->getMessage()]);
+                    } else {
+                        http_response_code(500);
+                        echo json_encode(['status' => 500, 'errorMessage' => 'Connection successful but failed to fetch games list. Please try connecting again.']);
+                    }
+                    exit;
                 }
                 break;
             case 'itch':
@@ -173,26 +248,65 @@ try {
                 if (empty($token)) {
                     throw new InvalidArgumentException('No token provided');
                 }
-                // Fetch /me to get user ID
-                $meUrl = 'https://itch.io/api/1/bearer/' . $token . '/me';
-                $ch = curl_init($meUrl);
-                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer ' . $token]);
-                $response = curl_exec($ch);
-                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                curl_close($ch);
-                if ($httpCode === 200) {
+                
+                // Start transaction for atomic connection + games fetch
+                $pdo->beginTransaction();
+                
+                try {
+                    // Fetch /me to get user ID
+                    $meUrl = 'https://itch.io/api/1/bearer/' . $token . '/me';
+                    $ch = curl_init($meUrl);
+                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer ' . $token]);
+                    $response = curl_exec($ch);
+                    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                    curl_close($ch);
+                    
+                    if ($httpCode !== 200) {
+                        throw new InvalidArgumentException('Itch API call failed: ' . $response);
+                    }
+                    
                     $userData = json_decode($response, true);
                     $extId = $userData['user']['id'] ?? '';
-                    if ($extId) {
-                        $stmt = $pdo->prepare('INSERT INTO user_accounts (user_id, ext_system, ext_id) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE ext_id = ?');
-                        $stmt->execute([$userId, 'itch', $extId, $extId]);
-                        echo json_encode(['success' => true, 'platform' => 'itch', 'ext_id' => $extId]);
-                    } else {
+                    if (!$extId) {
                         throw new InvalidArgumentException('No user ID in response');
                     }
-                } else {
-                    throw new InvalidArgumentException('Itch API call failed: ' . $response);
+                    
+                    // Store connection
+                    $stmt = $pdo->prepare('INSERT INTO user_accounts (user_id, ext_system, ext_id) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE ext_id = ?');
+                    $stmt->execute([$userId, 'itch', $extId, $extId]);
+                    
+                    // Store token temporarily for games fetch
+                    $_SESSION['temp_itch_token'] = $token;
+                    
+                    // Auto-fetch games using GamesManager
+                    $games = $gamesManager->autoFetchGames($userId, 'itch', $extId);
+                    
+                    // Clean up temporary token
+                    unset($_SESSION['temp_itch_token']);
+                    
+                    // Commit transaction
+                    $pdo->commit();
+                    
+                    echo json_encode(['success' => true, 'platform' => 'itch', 'ext_id' => $extId, 'games' => $games, 'gamesCount' => count($games)]);
+                } catch (Exception $e) {
+                    // Rollback connection if games fetch fails
+                    $pdo->rollback();
+                    
+                    // Clean up partial connection and temp token
+                    unset($_SESSION['temp_itch_token']);
+                    $cleanupStmt = $pdo->prepare('DELETE FROM user_accounts WHERE user_id = ? AND ext_system = ?');
+                    $cleanupStmt->execute([$userId, 'itch']);
+                    
+                    // Return appropriate error response
+                    if (str_contains($e->getMessage(), 'Please wait')) {
+                        http_response_code(429);
+                        echo json_encode(['status' => 429, 'errorMessage' => $e->getMessage()]);
+                    } else {
+                        http_response_code(500);
+                        echo json_encode(['status' => 500, 'errorMessage' => 'Connection successful but failed to fetch games list. Please try connecting again.']);
+                    }
+                    exit;
                 }
                 break;
             case 'gog':
