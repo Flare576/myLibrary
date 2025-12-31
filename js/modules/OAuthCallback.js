@@ -15,8 +15,21 @@ export class OAuthCallback {
     if (path.includes('epic-callback')) return 'epic';
     if (path.includes('itch-callback')) return 'itch';
     
-    // For unified callback.html, detect from URL parameters
+    // For unified callback.html, try to decode state parameter first (most reliable)
     const params = new URLSearchParams(window.location.search);
+    const stateParam = params.get('state');
+    
+    if (stateParam) {
+      try {
+        const stateData = JSON.parse(atob(stateParam));
+        if (stateData.platform) return stateData.platform;
+      } catch (e) {
+        // Fall through to other detection methods
+        console.warn('Failed to parse state parameter:', e);
+      }
+    }
+    
+    // Fallback: explicit platform parameter
     const platform = params.get('platform');
     if (platform) return platform;
     

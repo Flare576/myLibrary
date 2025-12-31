@@ -13,6 +13,7 @@ return [
     'app' => [
         'url' => 'http://localhost:8080',  // Local dev; change to https://yourdomain.com for prod
         'cache_dir' => __DIR__ . '/../cache/',  // Absolute path outside webroot, e.g., /home/user/cache/
+        'encryption_key' => 'YOUR_32_BYTE_ENCRYPTION_KEY_HERE',  // Generate with: openssl rand -hex 16
     ],
     'email' => [
         'smtp_host' => 'smtp.ionos.com',  // Or external like smtp.gmail.com
@@ -29,7 +30,7 @@ return [
         'epic' => [
             'client_id' => 'YOUR_EPIC_CLIENT_ID',  // From Epic Dev Portal
             'client_secret' => 'YOUR_EPIC_CLIENT_SECRET',
-            'redirect_uri' => 'http://localhost:8080/api/connect/epic/complete',  // Match portal
+            'redirect_uri' => 'http://localhost:8080/callback.html',  // Unified callback
         ],
         'gog' => [
             'private_key' => 'YOUR_GOG_PRIVATE_KEY',  // If using SDK; otherwise skip

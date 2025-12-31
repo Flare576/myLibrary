@@ -1,18 +1,20 @@
 <?php
 
+require_once __DIR__ . '/Encryption.php';
+
 class GamesManager
 {
     private PDO $pdo;
     private Cache $cache;
     private array $config;
-    private string $cacheDir;
+    private Encryption $encryption;
 
     public function __construct(PDO $pdo, Cache $cache, array $config)
     {
         $this->pdo = $pdo;
         $this->cache = $cache;
         $this->config = $config;
-        $this->cacheDir = $config['app']['cache_dir'];
+        $this->encryption = new Encryption($config['app']['encryption_key']);
     }
 
     /**
@@ -135,13 +137,13 @@ class GamesManager
     /**
      * Fetch games from platform API
      */
-    public function fetchFromPlatform(string $platform, string $extId): array
+    public function fetchFromPlatform(string $platform, string $extId, string $userId = ''): array
     {
         switch ($platform) {
             case 'steam':
                 return $this->fetchSteamGames($extId);
             case 'epic':
-                return $this->fetchEpicGames($extId);
+                return $this->fetchEpicGames($extId, $userId);
             case 'itch':
                 return $this->fetchItchGames($extId);
             case 'gog':
@@ -175,7 +177,7 @@ class GamesManager
         try {
             $extId = $row['ext_id'];
             $this->clearCachedGames($userId, $platform);
-            $games = $this->fetchFromPlatform($platform, $extId);
+            $games = $this->fetchFromPlatform($platform, $extId, $userId);
             $this->setCachedGames($userId, $platform, $games);
             $this->setLastRefresh($userId, $platform);
             
@@ -265,7 +267,7 @@ class GamesManager
                 
                 // Platform is connected, clear cache and fetch fresh data
                 try {
-                    $games = $this->fetchFromPlatform($platform, $platformMap[$platform]);
+                    $games = $this->fetchFromPlatform($platform, $platformMap[$platform], $userId);
                     $this->setCachedGames($userId, $platform, $games);
                     $this->setLastRefresh($userId, $platform);
                     
@@ -303,7 +305,7 @@ class GamesManager
         
         // Clear any existing cache and fetch fresh games
         $this->clearCachedGames($userId, $platform);
-        $games = $this->fetchFromPlatform($platform, $extId);
+        $games = $this->fetchFromPlatform($platform, $extId, $userId);
         $this->setCachedGames($userId, $platform, $games);
         $this->setLastRefresh($userId, $platform);
         
@@ -347,19 +349,104 @@ class GamesManager
     }
 
     /**
-     * Fetch Epic games from API
+     * Fetch Epic games from API with token management
      */
-    private function fetchEpicGames(string $extId): array
+    private function fetchEpicGames(string $extId, string $userId): array
     {
-        // Get access token from temporary session storage or fallback
-        $accessToken = $_SESSION['temp_epic_token'] ?? 'DUMMY_TOKEN';
-        $url = "https://api.epicgames.com/account/api/epic/v1/account/{$extId}/products?entitlementType=product";
+        // Get current user ID for token lookup
+        // This is a limitation - we need user context for proper token management
+        // For now, we'll assume it's passed in or use a session variable
+        $userId = $userId ?? $_SESSION['user_id'];
+        if (!$userId) {
+            throw new RuntimeException('User context required for Epic token management');
+        }
+        
+        // Get valid access token (refresh if needed)
+        $tokenData = $this->getValidEpicToken($userId);
+        
+        // Call Epic Entitlements API instead (should work with web client tokens)
+        // Get account ID from token data for API call
+        $tokenData = $this->getValidEpicToken($userId);
+        $accountId = $tokenData['account_id'] ?? 'unknown-account-id';
+        $url = "https://entitlement-public-service-prod08.ol.epicgames.com/entitlement/api/account/{$accountId}/entitlements?start=0&count=1000";
         
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Authorization: Bearer ' . $accessToken,
-            'Accept: application/json'
+            'Authorization: Bearer ' . $tokenData['access_token'],
+            'Accept: application/json',
+            'Content-Type: application/json',
+            'User-Agent: UELauncher/11.0.1-14907503+++Portal+Release-Live Windows/10.0.19041.1.256.64bit',
+            'X-Epic-Correlation-ID: UE4-c176f7154c2cda1061cc43ab52598e2b-93AFB486488A22FDF70486BD1D883628-BFCD88F649E997BA203FF69F07CE578C'
+        ]);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+         if ($httpCode !== 200) {
+            throw new RuntimeException('Epic Entitlements API error: ' . $response);
+        }
+        
+        $data = json_decode($response, true);
+        return $this->formatEpicGames($data);
+    }
+    
+    /**
+     * Get valid Epic access token, refresh if needed
+     */
+    private function getValidEpicToken(string $userId): array
+    {
+        $stmt = $this->pdo->prepare('SELECT access_token, token_expires_at FROM user_accounts WHERE user_id = ? AND ext_system = ?');
+        $stmt->execute([$userId, 'epic']);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        // Check if token is still valid (with 5-minute buffer)
+        if ($result && $result['access_token'] && strtotime($result['token_expires_at']) > time() + 300) {
+            // Return the stored valid token (don't fall back to refresh)
+            return [
+                'access_token' => $this->encryption->decrypt($result['access_token']),
+                'expires_at' => $result['token_expires_at']
+            ];
+        }
+        
+        // Token expired or invalid, refresh it
+        return $this->refreshEpicToken($userId);
+    }
+    
+    /**
+     * Refresh Epic access token
+     */
+    private function refreshEpicToken(string $userId): array
+    {
+        // Get current refresh token
+        $stmt = $this->pdo->prepare('SELECT refresh_token FROM user_accounts WHERE user_id = ? AND ext_system = ?');
+        $stmt->execute([$userId, 'epic']);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$result || !$result['refresh_token']) {
+            throw new RuntimeException('No refresh token available for Epic account. Please reconnect your account.');
+        }
+        
+        $refreshToken = $this->encryption->decrypt($result['refresh_token']);
+        
+        // Call Epic token refresh endpoint
+        $tokenUrl = 'https://api.epicgames.dev/epic/oauth/v2/token';
+        $data = http_build_query([
+            'grant_type' => 'refresh_token',
+            'refresh_token' => $refreshToken
+        ]);
+        
+        $authHeader = 'Basic ' . base64_encode($this->config['apis']['epic']['client_id'] . ':' . $this->config['apis']['epic']['client_secret']);
+        
+        $ch = curl_init($tokenUrl);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Content-Type: application/x-www-form-urlencoded',
+            'Authorization: ' . $authHeader
         ]);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 30);
@@ -368,15 +455,63 @@ class GamesManager
         curl_close($ch);
         
         if ($httpCode !== 200) {
-            throw new RuntimeException('Epic API error: ' . $response);
+            throw new RuntimeException('Epic token refresh failed: ' . $response);
         }
         
-        $data = json_decode($response, true);
+        $tokens = json_decode($response, true);
+        $newAccessToken = $tokens['access_token'] ?? '';
+        $newRefreshToken = $tokens['refresh_token'] ?? '';
+        $expiresIn = $tokens['expires_in'] ?? 3600;
+        
+        if (!$newAccessToken) {
+            throw new RuntimeException('Invalid token refresh response from Epic');
+        }
+        
+        // Update database with new tokens
+        $encryptedAccessToken = $this->encryption->encrypt($newAccessToken);
+        $encryptedRefreshToken = $newRefreshToken ? $this->encryption->encrypt($newRefreshToken) : null;
+        $tokenExpiresAt = date('Y-m-d H:i:s', time() + $expiresIn);
+        
+        $updateStmt = $this->pdo->prepare('
+            UPDATE user_accounts 
+            SET access_token = ?, refresh_token = ?, token_expires_at = ?
+            WHERE user_id = ? AND ext_system = ?
+        ');
+        $updateStmt->execute([$encryptedAccessToken, $encryptedRefreshToken, $tokenExpiresAt, $userId, 'epic']);
+        
+        return [
+            'access_token' => $newAccessToken,
+            'expires_at' => $tokenExpiresAt
+        ];
+    }
+    
+    /**
+     * Format Epic entitlements response to our game format
+     */
+    private function formatEpicGames(array $epicData): array
+    {
         $games = [];
-        foreach ($data['data'] ?? [] as $item) {
-            if ($item['status'] === 'FULFILLED') {
-                $games[] = ['id' => $item['catalogItemId'], 'platform' => 'epic'];
+        
+        // Handle Epic Entitlements API response structure
+        if (is_array($epicData)) {
+            foreach ($epicData as $entitlement) {
+                // Extract game info from entitlement
+                $namespace = $entitlement['namespace'] ?? '';
+                $catalogItemId = $entitlement['catalogItemId'] ?? '';
+                $appName = $entitlement['appName'] ?? '';
+                
+                // Basic game info from entitlement
+                $games[] = [
+                    'appid' => $catalogItemId ?: $entitlement['id'] ?? 'unknown',
+                    'name' => $appName ?: 'Unknown Epic Game',
+                    'image' => '/placeholder.jpg', // Entitlements don't include images
+                    'playtime' => 0,
+                    'platform' => 'epic'
+                ];
             }
+        } else {
+            // Fallback for unexpected response structure
+            error_log('Unexpected Epic Entitlements API response structure: ' . json_encode($epicData));
         }
         
         return $games;

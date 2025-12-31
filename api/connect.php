@@ -11,6 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once __DIR__ . '/../classes/Cache.php';
 require_once __DIR__ . '/../classes/GamesManager.php';
+require_once __DIR__ . '/../classes/Encryption.php';
 
 $config = include __DIR__ . '/../config.php';
 if (!isset($_SESSION['user_id'])) {
@@ -46,7 +47,7 @@ try {
         // Set callback URL based on platform - unified callback system
         $callbackPages = [
             'steam' => 'callback.html',
-            'epic' => 'callback.html', 
+            'epic' => 'callback.html',
             'itch' => 'callback.html'
         ];
         $callbackPage = $callbackPages[$platform] ?? 'callback.html';
@@ -70,11 +71,21 @@ try {
                 echo json_encode(['authUrl' => $authUrl]);
                 exit;
             case 'epic':
+                // Generate secure state with platform data
+                $stateData = [
+                    'platform' => 'epic',
+                    'nonce' => bin2hex(random_bytes(16)),
+                    'timestamp' => time()
+                ];
+                $state = base64_encode(json_encode($stateData));
+                $_SESSION['oauth_state'] = $stateData;
+                
                 $authUrl = 'https://www.epicgames.com/id/authorize?' . http_build_query([
                     'client_id' => $config['apis']['epic']['client_id'],
                     'response_type' => 'code',
                     'redirect_uri' => $redirectUri,
-                    'scope' => 'basicProfile account entitlements'
+                    'scope' => 'basicProfile account entitlements entitlements:account:ACCOUNT_ID:entitlements READ',
+                    'state' => $state
                 ]);
                 echo json_encode(['authUrl' => $authUrl]);
                 exit;
@@ -166,54 +177,100 @@ try {
                 break;
             case 'epic':
                 $code = $input['code'] ?? '';
+                $state = $input['state'] ?? '';
+                
                 if (empty($code)) {
                     throw new InvalidArgumentException('No code provided');
                 }
+                
+                // Verify state parameter
+                if (empty($state) || !isset($_SESSION['oauth_state'])) {
+                    throw new InvalidArgumentException('Invalid state parameter');
+                }
+                
+                $stateData = json_decode(base64_decode($state), true);
+                if (!$stateData || $stateData['platform'] !== 'epic') {
+                    throw new InvalidArgumentException('Invalid state data');
+                }
+                
+                // Verify nonce for security
+                if ($stateData['nonce'] !== $_SESSION['oauth_state']['nonce']) {
+                    throw new InvalidArgumentException('State verification failed');
+                }
+                
+                // Clean up session state
+                unset($_SESSION['oauth_state']);
                 
                 // Start transaction for atomic connection + games fetch
                 $pdo->beginTransaction();
                 
                 try {
-                    $tokenUrl = 'https://www.epicgames.com/id/api/epic/token';
+                    $tokenUrl = 'https://api.epicgames.dev/epic/oauth/v2/token';
+                    
                     $data = http_build_query([
                         'grant_type' => 'authorization_code',
-                        'client_id' => $config['apis']['epic']['client_id'],
-                        'client_secret' => $config['apis']['epic']['client_secret'],
-                        'redirect_uri' => $config['app']['url'] . '/api/connect/epic/complete',
+                        'redirect_uri' => $config['app']['url'] . '/callback.html',
                         'code' => $code
                     ]);
+                    
+                    // Basic Authorization header with client credentials
+                    $authHeader = 'Basic ' . base64_encode($config['apis']['epic']['client_id'] . ':' . $config['apis']['epic']['client_secret']);
+                    
                     $ch = curl_init($tokenUrl);
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                     curl_setopt($ch, CURLOPT_POST, true);
                     curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
-                    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/x-www-form-urlencoded']);
+                    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                        'Content-Type: application/x-www-form-urlencoded',
+                        'Authorization: ' . $authHeader
+                    ]);
                     $response = curl_exec($ch);
                     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
                     curl_close($ch);
                     
                     if ($httpCode !== 200) {
+                        error_log("Epic token exchange HTTP $httpCode: " . $response);
                         throw new InvalidArgumentException('Token exchange failed: ' . $response);
                     }
                     
                     $tokens = json_decode($response, true);
+                    error_log("Epic token response: " . json_encode($tokens));
                     $extId = $tokens['account_id'] ?? '';
                     $accessToken = $tokens['access_token'] ?? '';
-                    if (!$extId) {
-                        throw new InvalidArgumentException('No account ID in response');
+                    $refreshToken = $tokens['refresh_token'] ?? '';
+                    $expiresIn = $tokens['expires_in'] ?? 3600;
+                    
+                    if (!$extId || !$accessToken) {
+                        throw new InvalidArgumentException('Missing required token data');
                     }
                     
-                    // Store connection
-                    $stmt = $pdo->prepare('INSERT INTO user_accounts (user_id, ext_system, ext_id) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE ext_id = ?');
-                    $stmt->execute([$userId, 'epic', $extId, $extId]);
+                    // Encrypt tokens before storage
+                    $encryption = new Encryption($config['app']['encryption_key']);
+                    $encryptedAccessToken = $encryption->encrypt($accessToken);
+                    $encryptedRefreshToken = $refreshToken ? $encryption->encrypt($refreshToken) : null;
+                    $tokenExpiresAt = date('Y-m-d H:i:s', time() + $expiresIn);
                     
-                    // Store access token temporarily for games fetch
-                    $_SESSION['temp_epic_token'] = $accessToken;
+                    // Store Epic tokens and connection
+                    $stmt = $pdo->prepare('
+                        INSERT INTO user_accounts (user_id, ext_system, ext_id, access_token, refresh_token, token_expires_at, epic_account_id) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?) 
+                        ON DUPLICATE KEY UPDATE 
+                        ext_id = VALUES(ext_id), 
+                        access_token = VALUES(access_token),
+                        refresh_token = VALUES(refresh_token),
+                        token_expires_at = VALUES(token_expires_at),
+                        epic_account_id = VALUES(epic_account_id)
+                    ');
+                    $stmt->execute([$userId, 'epic', $extId, $encryptedAccessToken, $encryptedRefreshToken, $tokenExpiresAt, $extId]);
                     
                     // Auto-fetch games using GamesManager
-                    $games = $gamesManager->autoFetchGames($userId, 'epic', $extId);
-                    
-                    // Clean up temporary token
-                    unset($_SESSION['temp_epic_token']);
+                    try {
+                        $games = $gamesManager->autoFetchGames($userId, 'epic', $extId);
+                        error_log("Epic games fetch successful: " . count($games) . " games");
+                    } catch (Exception $gameError) {
+                        error_log("Epic games fetch error: " . $gameError->getMessage());
+                        throw new Exception('Games fetch failed: ' . $gameError->getMessage());
+                    }
                     
                     // Commit transaction
                     $pdo->commit();
@@ -223,8 +280,7 @@ try {
                     // Rollback connection if games fetch fails
                     $pdo->rollback();
                     
-                    // Clean up partial connection and temp token
-                    unset($_SESSION['temp_epic_token']);
+                    // Clean up partial connection
                     $cleanupStmt = $pdo->prepare('DELETE FROM user_accounts WHERE user_id = ? AND ext_system = ?');
                     $cleanupStmt->execute([$userId, 'epic']);
                     
@@ -290,13 +346,16 @@ try {
                     
                     echo json_encode(['success' => true, 'platform' => 'itch', 'ext_id' => $extId, 'games' => $games, 'gamesCount' => count($games)]);
                 } catch (Exception $e) {
+                    // Log the actual error for debugging
+                    error_log("Epic connection error: " . $e->getMessage());
+                    
                     // Rollback connection if games fetch fails
                     $pdo->rollback();
                     
-                    // Clean up partial connection and temp token
-                    unset($_SESSION['temp_itch_token']);
+                    // Clean up partial connection
+                    unset($_SESSION['oauth_state']);
                     $cleanupStmt = $pdo->prepare('DELETE FROM user_accounts WHERE user_id = ? AND ext_system = ?');
-                    $cleanupStmt->execute([$userId, 'itch']);
+                    $cleanupStmt->execute([$userId, 'epic']);
                     
                     // Return appropriate error response
                     if (str_contains($e->getMessage(), 'Please wait')) {

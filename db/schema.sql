@@ -21,10 +21,16 @@ CREATE TABLE user_accounts (
     ext_system ENUM('steam', 'epic', 'gog', 'itch', 'humble') NOT NULL,
     ext_id VARCHAR(64),
     nonce CHAR(36),
+    access_token TEXT NULL,
+    refresh_token TEXT NULL,
+    token_expires_at TIMESTAMP NULL,
+    epic_account_id VARCHAR(64) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     UNIQUE KEY unique_user_ext (user_id, ext_system),
-    INDEX idx_ext_system (ext_system)
+    INDEX idx_ext_system (ext_system),
+    INDEX idx_token_expires (token_expires_at),
+    INDEX idx_user_platform_tokens (user_id, ext_system)
 ) ENGINE=InnoDB;
 
 CREATE TABLE user_tokens (
