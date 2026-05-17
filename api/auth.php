@@ -24,21 +24,26 @@ require_once __DIR__ . '/../classes/PasswordlessAuth.php';
 require_once __DIR__ . '/../classes/Cache.php';
 
 try {
+    $dsn = isset($config['db']['socket'])
+        ? "mysql:unix_socket={$config['db']['socket']};dbname={$config['db']['dbname']};charset={$config['db']['charset']}"
+        : "mysql:host={$config['db']['host']};dbname={$config['db']['dbname']};charset={$config['db']['charset']}";
     $pdo = new PDO(
-        "mysql:host={$config['db']['host']};dbname={$config['db']['dbname']};charset={$config['db']['charset']}",
+        $dsn,
         $config['db']['user'],
         $config['db']['pass'],
         [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
     );
 
-    $auth = new App\Auth\PasswordlessAuth($pdo, $config['app']['url'], $config['email'] ?? []);
+    $auth = new App\Auth\PasswordlessAuth($pdo, $config['app']['url'], $config['email'] ?? [], $config['app']['dev_mode'] ?? false);
 
     $input = json_decode(file_get_contents('php://input'), true);
     $method = $_SERVER['REQUEST_METHOD'];
     $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
     
-    // Remove subdirectory from path for routing
-    $path = preg_replace('#^/[^/]+/#', '/', $path);
+    // Remove subdirectory prefix only when running under a subdir (e.g. production /myLibrary/)
+    if (!str_starts_with($path, '/api/')) {
+        $path = preg_replace('#^/[^/]+/#', '/', $path);
+    }
 
     if ($method === 'POST' && $path === '/api/auth/init') {
         $email = $input['email'] ?? '';

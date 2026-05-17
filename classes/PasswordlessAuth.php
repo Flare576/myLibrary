@@ -18,12 +18,14 @@ class PasswordlessAuth
     private int $rateLimitAttempts = 5;
     private int $rateLimitWindowMinutes = 60;
     private array $emailConfig;
+    private bool $devMode;
 
-    public function __construct(PDO $pdo, string $appUrl, array $emailConfig = [])
+    public function __construct(PDO $pdo, string $appUrl, array $emailConfig = [], bool $devMode = false)
     {
         $this->pdo = $pdo;
         $this->appUrl = rtrim($appUrl, '/');
         $this->emailConfig = $emailConfig;
+        $this->devMode = $devMode;
     }
 
     public function init(string $email, string $ip, string $userAgent): string
@@ -117,6 +119,13 @@ class PasswordlessAuth
         <p>Or copy token: {$token}</p>
         <p>Expires in {$this->tokenExpiryMinutes} minutes.</p>
         ";
+
+        // Dev mode: skip email, just log the token
+        if ($this->devMode) {
+            error_log("[DEV] Login token for {$email}: {$token}");
+            error_log("[DEV] Login URL: {$this->appUrl}?token={$token}");
+            return;
+        }
 
         error_log("Attempting to send email to: " . $email);
 
