@@ -21,8 +21,11 @@ if (!isset($_SESSION['user_id'])) {
 $userId = $_SESSION['user_id'];
 
 try {
+    $dsn = isset($config['db']['socket'])
+        ? "mysql:unix_socket={$config['db']['socket']};dbname={$config['db']['dbname']};charset={$config['db']['charset']}"
+        : "mysql:host={$config['db']['host']};dbname={$config['db']['dbname']};charset={$config['db']['charset']}";
     $pdo = new PDO(
-        "mysql:host={$config['db']['host']};dbname={$config['db']['dbname']};charset={$config['db']['charset']}",
+        $dsn,
         $config['db']['user'],
         $config['db']['pass'],
         [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
@@ -33,8 +36,10 @@ try {
 
     $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
     
-    // Remove subdirectory from path for routing (same as auth.php)
-    $path = preg_replace('#^/[^/]+/#', '/', $path);
+    // Remove subdirectory prefix only when running under a subdir (e.g. production /myLibrary/) (same as auth.php)
+    if (!str_starts_with($path, '/api/')) {
+        $path = preg_replace('#^/[^/]+/#', '/', $path);
+    }
     
     $parts = explode('/', trim($path, '/'));
     if (count($parts) < 3 || $parts[0] !== 'api' || $parts[1] !== 'games') {

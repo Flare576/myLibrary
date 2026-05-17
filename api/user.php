@@ -18,8 +18,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $config = include __DIR__ . '/../config.php';
 
 try {
+    $dsn = isset($config['db']['socket'])
+        ? "mysql:unix_socket={$config['db']['socket']};dbname={$config['db']['dbname']};charset={$config['db']['charset']}"
+        : "mysql:host={$config['db']['host']};dbname={$config['db']['dbname']};charset={$config['db']['charset']}";
     $pdo = new PDO(
-        "mysql:host={$config['db']['host']};dbname={$config['db']['dbname']};charset={$config['db']['charset']}",
+        $dsn,
         $config['db']['user'],
         $config['db']['pass'],
         [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
@@ -28,8 +31,10 @@ try {
     $method = $_SERVER['REQUEST_METHOD'];
     $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
     
-    // Remove subdirectory from path for routing
-    $path = preg_replace('#^/[^/]+/#', '/', $path);
+    // Remove subdirectory prefix only when running under a subdir (e.g. production /myLibrary/)
+    if (!str_starts_with($path, '/api/')) {
+        $path = preg_replace('#^/[^/]+/#', '/', $path);
+    }
 
     // Check if user is authenticated
     if (!isset($_SESSION['user_id'])) {
