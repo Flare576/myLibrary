@@ -34,8 +34,11 @@ $userId = $_SESSION['user_id'];
 $platform = $_POST['platform'] ?? 'steam';
 
 try {
+    $dsn = isset($config['db']['socket'])
+        ? "mysql:unix_socket={$config['db']['socket']};dbname={$config['db']['dbname']};charset={$config['db']['charset']}"
+        : "mysql:host={$config['db']['host']};dbname={$config['db']['dbname']};charset={$config['db']['charset']}";
     $pdo = new PDO(
-        "mysql:host={$config['db']['host']};dbname={$config['db']['dbname']};charset={$config['db']['charset']}",
+        $dsn,
         $config['db']['user'],
         $config['db']['pass'],
         [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
