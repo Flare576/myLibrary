@@ -349,48 +349,48 @@ class GamesManager
     }
 
     /**
-     * Fetch Epic games from API with token management
+     * Fetch Epic games via the library-service endpoint (same as Heroic/legendary/Playnite)
      */
     private function fetchEpicGames(string $extId, string $userId): array
     {
-        // Get current user ID for token lookup
-        // This is a limitation - we need user context for proper token management
-        // For now, we'll assume it's passed in or use a session variable
-        $userId = $userId ?? $_SESSION['user_id'];
-        if (!$userId) {
-            throw new RuntimeException('User context required for Epic token management');
-        }
-        
-        // Get valid access token (refresh if needed)
         $tokenData = $this->getValidEpicToken($userId);
-        
-        // Call Epic Entitlements API instead (should work with web client tokens)
-        // Get account ID from token data for API call
-        $tokenData = $this->getValidEpicToken($userId);
-        $accountId = $tokenData['account_id'] ?? 'unknown-account-id';
-        $url = "https://entitlement-public-service-prod08.ol.epicgames.com/entitlement/api/account/{$accountId}/entitlements?start=0&count=1000";
-        
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Authorization: Bearer ' . $tokenData['access_token'],
-            'Accept: application/json',
-            'Content-Type: application/json',
-            'User-Agent: UELauncher/11.0.1-14907503+++Portal+Release-Live Windows/10.0.19041.1.256.64bit',
-            'X-Epic-Correlation-ID: UE4-c176f7154c2cda1061cc43ab52598e2b-93AFB486488A22FDF70486BD1D883628-BFCD88F649E997BA203FF69F07CE578C'
-        ]);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-        
-         if ($httpCode !== 200) {
-            throw new RuntimeException('Epic Entitlements API error: ' . $response);
-        }
-        
-        $data = json_decode($response, true);
-        return $this->formatEpicGames($data);
+        $accessToken = $tokenData['access_token'];
+        $headers = [
+            'Authorization: bearer ' . $accessToken,
+            'User-Agent: EpicGamesLauncher/14.0.8-22004686+++Portal+Release-Live'
+        ];
+
+        $records = [];
+        $cursor = null;
+
+        // Paginate through the full library
+        do {
+            $params = ['includeMetadata' => 'true', 'platform' => 'Windows'];
+            if ($cursor !== null) {
+                $params['cursor'] = $cursor;
+            }
+            $url = 'https://library-service.live.use1a.on.epicgames.com/library/api/public/items?' . http_build_query($params);
+
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($httpCode !== 200) {
+                error_log("Epic library-service HTTP $httpCode: " . $response);
+                throw new RuntimeException('Epic library API error: ' . $response);
+            }
+
+            $data = json_decode($response, true);
+            $records = array_merge($records, $data['records'] ?? []);
+            $cursor = $data['responseMetadata']['nextCursor'] ?? null;
+        } while ($cursor !== null);
+
+        return $this->formatEpicGames($records);
     }
     
     /**
@@ -416,104 +416,98 @@ class GamesManager
     }
     
     /**
-     * Refresh Epic access token
+     * Refresh Epic access token using the launcher endpoint
      */
     private function refreshEpicToken(string $userId): array
     {
-        // Get current refresh token
         $stmt = $this->pdo->prepare('SELECT refresh_token FROM user_accounts WHERE user_id = ? AND ext_system = ?');
         $stmt->execute([$userId, 'epic']);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        
+
         if (!$result || !$result['refresh_token']) {
             throw new RuntimeException('No refresh token available for Epic account. Please reconnect your account.');
         }
-        
+
         $refreshToken = $this->encryption->decrypt($result['refresh_token']);
-        
-        // Call Epic token refresh endpoint
-        $tokenUrl = 'https://api.epicgames.dev/epic/oauth/v2/token';
-        $data = http_build_query([
-            'grant_type' => 'refresh_token',
-            'refresh_token' => $refreshToken
-        ]);
-        
-        $authHeader = 'Basic ' . base64_encode($this->config['apis']['epic']['client_id'] . ':' . $this->config['apis']['epic']['client_secret']);
-        
+
+        // Same launcher endpoint used for initial token exchange
+        $tokenUrl = 'https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/token';
+        $launcherClientId = '34a02cf8f4414e29b15921876da36f9a';
+        $launcherClientSecret = 'daafbccc737745039dffe53d94fc76cf';
+
         $ch = curl_init($tokenUrl);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
+            'grant_type' => 'refresh_token',
+            'refresh_token' => $refreshToken,
+            'token_type' => 'eg1'
+        ]));
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             'Content-Type: application/x-www-form-urlencoded',
-            'Authorization: ' . $authHeader
+            'Authorization: Basic ' . base64_encode($launcherClientId . ':' . $launcherClientSecret),
+            'User-Agent: EpicGamesLauncher/14.0.8-22004686+++Portal+Release-Live'
         ]);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 30);
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
-        
+
         if ($httpCode !== 200) {
             throw new RuntimeException('Epic token refresh failed: ' . $response);
         }
-        
+
         $tokens = json_decode($response, true);
         $newAccessToken = $tokens['access_token'] ?? '';
         $newRefreshToken = $tokens['refresh_token'] ?? '';
-        $expiresIn = $tokens['expires_in'] ?? 3600;
-        
+        $expiresIn = $tokens['expires_in'] ?? 7200;
+
         if (!$newAccessToken) {
             throw new RuntimeException('Invalid token refresh response from Epic');
         }
-        
-        // Update database with new tokens
+
         $encryptedAccessToken = $this->encryption->encrypt($newAccessToken);
         $encryptedRefreshToken = $newRefreshToken ? $this->encryption->encrypt($newRefreshToken) : null;
         $tokenExpiresAt = date('Y-m-d H:i:s', time() + $expiresIn);
-        
-        $updateStmt = $this->pdo->prepare('
-            UPDATE user_accounts 
+
+        $this->pdo->prepare('
+            UPDATE user_accounts
             SET access_token = ?, refresh_token = ?, token_expires_at = ?
             WHERE user_id = ? AND ext_system = ?
-        ');
-        $updateStmt->execute([$encryptedAccessToken, $encryptedRefreshToken, $tokenExpiresAt, $userId, 'epic']);
-        
+        ')->execute([$encryptedAccessToken, $encryptedRefreshToken, $tokenExpiresAt, $userId, 'epic']);
+
         return [
             'access_token' => $newAccessToken,
             'expires_at' => $tokenExpiresAt
         ];
     }
-    
+
     /**
-     * Format Epic entitlements response to our game format
+     * Format Epic library-service records into our standard game format
      */
-    private function formatEpicGames(array $epicData): array
+    private function formatEpicGames(array $records): array
     {
         $games = [];
-        
-        // Handle Epic Entitlements API response structure
-        if (is_array($epicData)) {
-            foreach ($epicData as $entitlement) {
-                // Extract game info from entitlement
-                $namespace = $entitlement['namespace'] ?? '';
-                $catalogItemId = $entitlement['catalogItemId'] ?? '';
-                $appName = $entitlement['appName'] ?? '';
-                
-                // Basic game info from entitlement
-                $games[] = [
-                    'appid' => $catalogItemId ?: $entitlement['id'] ?? 'unknown',
-                    'name' => $appName ?: 'Unknown Epic Game',
-                    'image' => '/placeholder.jpg', // Entitlements don't include images
-                    'playtime' => 0,
-                    'platform' => 'epic'
-                ];
+
+        foreach ($records as $record) {
+            // Skip non-game records (DLC, add-ons, etc.)
+            if (($record['recordType'] ?? '') !== 'APPLICATION') {
+                continue;
             }
-        } else {
-            // Fallback for unexpected response structure
-            error_log('Unexpected Epic Entitlements API response structure: ' . json_encode($epicData));
+
+            $name = $record['sandboxName'] ?? $record['appName'] ?? 'Unknown Epic Game';
+            $appId = $record['catalogItemId'] ?? $record['appName'] ?? 'unknown';
+
+            $games[] = [
+                'appid'     => $appId,
+                'name'      => $name,
+                'image'     => null, // library-service doesn't include artwork; would need catalog API
+                'playtime'  => 0,
+                'platform'  => 'epic'
+            ];
         }
-        
+
         return $games;
     }
 

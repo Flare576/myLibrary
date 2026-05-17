@@ -74,23 +74,22 @@ try {
                 echo json_encode(['authUrl' => $authUrl]);
                 exit;
             case 'epic':
-                // Generate secure state with platform data
+                // Use Epic launcher client flow (same as Heroic/legendary/Playnite)
+                // This uses Epic's internal launcherAppClient2 credentials, not the dev portal
                 $stateData = [
                     'platform' => 'epic',
                     'nonce' => bin2hex(random_bytes(16)),
                     'timestamp' => time()
                 ];
-                $state = base64_encode(json_encode($stateData));
                 $_SESSION['oauth_state'] = $stateData;
-                
-                $authUrl = 'https://www.epicgames.com/id/authorize?' . http_build_query([
-                    'client_id' => $config['apis']['epic']['client_id'],
-                    'response_type' => 'code',
-                    'redirect_uri' => $redirectUri,
-                    'scope' => 'basicProfile account entitlements entitlements:account:ACCOUNT_ID:entitlements READ',
-                    'state' => $state
+
+                // Redirect user to Epic login; after login Epic redirects back with ?code=
+                // The launcherAppClient2 client ID is the same one Epic's own launcher uses
+                $authUrl = 'https://www.epicgames.com/id/api/redirect?' . http_build_query([
+                    'clientId' => '34a02cf8f4414e29b15921876da36f9a',
+                    'responseType' => 'code'
                 ]);
-                echo json_encode(['authUrl' => $authUrl]);
+                echo json_encode(['authUrl' => $authUrl, 'state' => base64_encode(json_encode($stateData))]);
                 exit;
             case 'itch':
                 $state = bin2hex(random_bytes(32));
@@ -208,16 +207,19 @@ try {
                 $pdo->beginTransaction();
                 
                 try {
-                    $tokenUrl = 'https://api.epicgames.dev/epic/oauth/v2/token';
-                    
+                    // Use Epic's internal launcher endpoint (same as Heroic/legendary/Playnite)
+                    // launcherAppClient2 credentials - Epic's own launcher uses these
+                    $tokenUrl = 'https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/token';
+                    $launcherClientId = '34a02cf8f4414e29b15921876da36f9a';
+                    $launcherClientSecret = 'daafbccc737745039dffe53d94fc76cf';
+
                     $data = http_build_query([
                         'grant_type' => 'authorization_code',
-                        'redirect_uri' => $config['app']['url'] . '/callback.html',
-                        'code' => $code
+                        'code' => $code,
+                        'token_type' => 'eg1'
                     ]);
-                    
-                    // Basic Authorization header with client credentials
-                    $authHeader = 'Basic ' . base64_encode($config['apis']['epic']['client_id'] . ':' . $config['apis']['epic']['client_secret']);
+
+                    $authHeader = 'Basic ' . base64_encode($launcherClientId . ':' . $launcherClientSecret);
                     
                     $ch = curl_init($tokenUrl);
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -225,7 +227,8 @@ try {
                     curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
                     curl_setopt($ch, CURLOPT_HTTPHEADER, [
                         'Content-Type: application/x-www-form-urlencoded',
-                        'Authorization: ' . $authHeader
+                        'Authorization: ' . $authHeader,
+                        'User-Agent: EpicGamesLauncher/14.0.8-22004686+++Portal+Release-Live'
                     ]);
                     $response = curl_exec($ch);
                     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
