@@ -1,5 +1,0 @@
-# OpenCode should read ticket files, but never commit them to git (which is why they're in .gitignore)
-!tickets/
-
-# OpenCode should be aware of this file and data, but never commit it to git (which is why it's in .gitignore)
-!config.php
