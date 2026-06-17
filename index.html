@@ -26,13 +26,20 @@
 
         <div id="authenticated-view" class="card">
             <h2 id="welcome-msg">Welcome</h2>
-            <p>No platforms connected yet.</p>
+            <button id="steam-connect-btn">Connect Steam</button>
+            <div id="steam-error" style="color: red"></div>
+            <section id="steam-library" style="display:none">
+                <p id="steam-game-count">Steam: 0 games</p>
+                <div id="steam-games-grid"></div>
+                <button id="steam-disconnect-btn">Disconnect Steam</button>
+            </section>
             <button id="logout-btn">Sign Out</button>
         </div>
     </main>
 
     <script type="module">
         import { authManager } from './js/auth.js';
+        import { steamManager } from './js/steam.js';
 
         const appContainer = document.getElementById('app-container');
         const loginForm = document.getElementById('login-form');
@@ -42,17 +49,79 @@
         const welcomeMsg = document.getElementById('welcome-msg');
         const usernameInput = document.getElementById('username');
         const passphraseInput = document.getElementById('passphrase');
+        const steamConnectBtn = document.getElementById('steam-connect-btn');
+        const steamLibrary = document.getElementById('steam-library');
+        const steamGamesGrid = document.getElementById('steam-games-grid');
+        const steamGameCount = document.getElementById('steam-game-count');
 
-        document.addEventListener('auth:login', (event) => {
-            const { username } = event.detail;
+        const pageParams = new URLSearchParams(window.location.search);
+        const pendingSteamCallback = pageParams.get('steam_connected') === '1';
+        const pendingSteamError = pageParams.get('steam_error') ?? null;
+
+        function renderSteamGames(games) {
+            steamGamesGrid.innerHTML = '';
+            (games || []).forEach(game => {
+                const card = document.createElement('div');
+                card.className = 'game-card';
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'game-name';
+                nameSpan.textContent = game.name;
+                card.appendChild(nameSpan);
+                steamGamesGrid.appendChild(card);
+            });
+            const n = (games || []).length;
+            steamGameCount.textContent = `Steam: ${n} ${n === 1 ? 'game' : 'games'}`;
+        }
+
+        document.addEventListener('auth:login', async (event) => {
+            const { username, state } = event.detail;
             appContainer.dataset.authState = 'authenticated';
             welcomeMsg.textContent = `Welcome, ${username}`;
+
+            if (pendingSteamError) {
+                const errDiv = document.getElementById('steam-error');
+                if (errDiv) errDiv.textContent = pendingSteamError;
+                window.history.replaceState({}, document.title, '/');
+            }
+
+            if (pendingSteamCallback) {
+                await steamManager.handleCallback(authManager);
+            } else if (state.steam) {
+                renderSteamGames(state.steam.games);
+                steamConnectBtn.style.display = 'none';
+                steamLibrary.style.display = '';
+            }
         });
 
         document.addEventListener('auth:logout', () => {
             appContainer.dataset.authState = 'unauthenticated';
             loginForm.reset();
             loginError.textContent = '';
+            steamConnectBtn.style.display = '';
+            steamLibrary.style.display = 'none';
+        });
+
+        document.addEventListener('steam:connected', (event) => {
+            const { games } = event.detail;
+            renderSteamGames(games);
+            steamConnectBtn.style.display = 'none';
+            steamLibrary.style.display = '';
+        });
+
+        document.addEventListener('steam:disconnected', () => {
+            steamConnectBtn.style.display = '';
+            steamLibrary.style.display = 'none';
+        });
+
+        document.addEventListener('steam:error', (event) => {
+            const msg = event.detail?.message || 'Steam connection failed';
+            const errDiv = document.getElementById('steam-error');
+            if (errDiv) errDiv.textContent = msg;
+        });
+
+        steamConnectBtn.addEventListener('click', () => steamManager.connectSteam());
+        document.getElementById('steam-disconnect-btn').addEventListener('click', () => {
+            steamManager.disconnectSteam(authManager);
         });
 
         loginForm.addEventListener('submit', async (e) => {

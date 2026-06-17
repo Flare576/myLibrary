@@ -7,6 +7,21 @@ if (str_starts_with($path, '/api/sync/')) {
     exit;
 }
 
+if (str_starts_with($path, '/api/steam/init')) {
+    require __DIR__ . '/api/steam/init.php';
+    exit;
+}
+
+if (str_starts_with($path, '/api/steam/callback')) {
+    require __DIR__ . '/api/steam/callback.php';
+    exit;
+}
+
+if (str_starts_with($path, '/api/steam/games')) {
+    require __DIR__ . '/api/steam/games.php';
+    exit;
+}
+
 if (file_exists(__DIR__ . $path) && is_file(__DIR__ . $path)) {
     return false;
 }

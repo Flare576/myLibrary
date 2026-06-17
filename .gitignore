@@ -12,3 +12,7 @@ logs/
 
 # Don't commit our "ticket" system
 tickets/
+
+# Node / test tooling
+node_modules/
+test-results/
