@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyLibrary</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <main id="app-container" data-auth-state="unauthenticated">
+        <div id="unauthenticated-view" class="card">
+            <h2>Sign In</h2>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="passphrase">Passphrase</label>
+                    <input type="password" id="passphrase" name="passphrase" required autocomplete="current-password">
+                </div>
+                <button type="submit" id="login-btn">Sign In</button>
+                <div id="login-error"></div>
+            </form>
+        </div>
+
+        <div id="authenticated-view" class="card">
+            <h2 id="welcome-msg">Welcome</h2>
+            <p>No platforms connected yet.</p>
+            <button id="logout-btn">Sign Out</button>
+        </div>
+    </main>
+
+    <script type="module">
+        import { authManager } from './js/auth.js';
+
+        const appContainer = document.getElementById('app-container');
+        const loginForm = document.getElementById('login-form');
+        const loginBtn = document.getElementById('login-btn');
+        const loginError = document.getElementById('login-error');
+        const logoutBtn = document.getElementById('logout-btn');
+        const welcomeMsg = document.getElementById('welcome-msg');
+        const usernameInput = document.getElementById('username');
+        const passphraseInput = document.getElementById('passphrase');
+
+        document.addEventListener('auth:login', (event) => {
+            const { username } = event.detail;
+            appContainer.dataset.authState = 'authenticated';
+            welcomeMsg.textContent = `Welcome, ${username}`;
+        });
+
+        document.addEventListener('auth:logout', () => {
+            appContainer.dataset.authState = 'unauthenticated';
+            loginForm.reset();
+            loginError.textContent = '';
+        });
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = usernameInput.value;
+            const passphrase = passphraseInput.value;
+
+            if (!username || !passphrase) return;
+
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Signing in…';
+            loginError.textContent = '';
+
+            try {
+                await authManager.login(username, passphrase);
+            } catch (err) {
+                loginError.textContent = err.message || 'Login failed';
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Sign In';
+            }
+        });
+
+        logoutBtn.addEventListener('click', () => {
+            authManager.logout();
+            loginBtn.disabled = false;
+            loginBtn.textContent = 'Sign In';
+        });
+    </script>
+</body>
+</html>
