@@ -124,6 +124,16 @@
             steamManager.disconnectSteam(authManager);
         });
 
+        const SESSION_KEY = 'ml_session';
+
+        function saveSession(username, passphrase) {
+            sessionStorage.setItem(SESSION_KEY, JSON.stringify({ username, passphrase }));
+        }
+
+        function clearSession() {
+            sessionStorage.removeItem(SESSION_KEY);
+        }
+
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const username = usernameInput.value;
@@ -137,6 +147,7 @@
 
             try {
                 await authManager.login(username, passphrase);
+                saveSession(username, passphrase);
             } catch (err) {
                 loginError.textContent = err.message || 'Login failed';
                 loginBtn.disabled = false;
@@ -145,10 +156,21 @@
         });
 
         logoutBtn.addEventListener('click', () => {
+            clearSession();
             authManager.logout();
             loginBtn.disabled = false;
             loginBtn.textContent = 'Sign In';
         });
+
+        const storedSession = sessionStorage.getItem(SESSION_KEY);
+        if (storedSession) {
+            try {
+                const { username, passphrase } = JSON.parse(storedSession);
+                await authManager.login(username, passphrase);
+            } catch (_e) {
+                clearSession();
+            }
+        }
     </script>
 </body>
 </html>
