@@ -1,11 +1,11 @@
 # Tests
 
-47 tests across 5 files. Two runners: **Bun** (unit) and **Playwright** (integration + browser).
+51 tests across 7 files. Two runners: **Bun** (unit) and **Playwright** (integration + browser).
 
 ## Quick start
 
 ```bash
-npm test                   # everything (43 tests)
+npm test                   # everything (51 tests)
 npm run test:unit          # crypto + auth, no server needed
 npm run test:integration   # sync.php live HTTP — needs PHP server on :8181
 npm run test:browser       # index.html in Chromium — needs PHP server on :8181
@@ -25,6 +25,8 @@ php -S 127.0.0.1:8181 router.php &
 | `sync.spec.js` | Playwright | 9 | `api/sync.php` — HTTP round-trips, ETag enforcement, validation, injection |
 | `browser.spec.js` | Playwright | 10 | `index.html` — auth state machine, error display, logout, Steam UI state |
 | `steam.spec.js` | Playwright | 8 | `api/steam/*` — init redirect shape, callback rejection, games validation |
+| `schema.spec.js` | Playwright | 1 | `db/schema.sql` live regression — user_blobs MEDIUMTEXT (>64KB blobs) |
+| `session.spec.js` | Playwright | 3 | `index.html` SessionStore — auto-login, logout clears, stale creds graceful |
 
 ## Adding tests for a new phase
 
