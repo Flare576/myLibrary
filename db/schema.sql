@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- Encrypted blob store
 CREATE TABLE IF NOT EXISTS user_blobs (
   user_id VARCHAR(255) PRIMARY KEY,
-  `blob` TEXT NOT NULL,               -- JSON string: {iv, ciphertext} -- server never decrypts
+  `blob` MEDIUMTEXT NOT NULL,          -- JSON string: {iv, ciphertext} -- server never decrypts; MEDIUMTEXT supports ~16MB for large game libraries
   etag VARCHAR(64),                   -- MD5 of blob for concurrency control
   updated_at TIMESTAMP DEFAULT NOW() ON UPDATE NOW(),
   FOREIGN KEY (user_id) REFERENCES users(id)
