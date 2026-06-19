@@ -26,38 +26,49 @@
 
         <div id="authenticated-view" class="card">
             <h2 id="welcome-msg">Welcome</h2>
-            <button id="steam-connect-btn">Connect Steam</button>
-            <div id="steam-error" style="color: red"></div>
-            <section id="steam-library" style="display:none">
-                <p id="steam-game-count">Steam: 0 games</p>
-                <div id="steam-games-grid"></div>
-                <button id="steam-disconnect-btn">Disconnect Steam</button>
-            </section>
-            <section id="epic-connect-section">
-                <p>Connect your Epic Games library</p>
-                <a id="epic-open-btn" href="#" target="_blank" rel="noopener noreferrer">Open Epic page</a>
-                <div class="form-group">
-                    <label for="epic-code-input">Paste authorization code:</label>
-                    <input type="text" id="epic-code-input" placeholder="authorizationCode value from Epic page">
-                </div>
-                <button id="epic-connect-btn">Connect Epic</button>
-                <div id="epic-error" style="color: red"></div>
-            </section>
-            <section id="epic-library" style="display:none">
-                <p id="epic-game-count">Epic: 0 games</p>
-                <div id="epic-games-grid"></div>
-                <button id="epic-disconnect-btn">Disconnect Epic</button>
-            </section>
-            <section id="itch-connect-section">
-                <p>Connect your itch.io library</p>
-                <a id="itch-open-btn" href="/api/itch/init">Connect itch.io</a>
-                <div id="itch-error" style="color: red"></div>
-            </section>
-            <section id="itch-library" style="display:none">
-                <p id="itch-game-count">itch.io: 0 games</p>
-                <div id="itch-games-grid"></div>
-                <button id="itch-disconnect-btn">Disconnect itch.io</button>
-            </section>
+            <nav id="view-tabs">
+                <button id="tab-library" class="tab-btn tab-active">Library</button>
+                <button id="tab-bundles" class="tab-btn">Bundles</button>
+            </nav>
+            <div id="library-view">
+                <button id="steam-connect-btn">Connect Steam</button>
+                <div id="steam-error" style="color: red"></div>
+                <section id="steam-library" style="display:none">
+                    <p id="steam-game-count">Steam: 0 games</p>
+                    <div id="steam-games-grid"></div>
+                    <button id="steam-disconnect-btn">Disconnect Steam</button>
+                </section>
+                <section id="epic-connect-section">
+                    <p>Connect your Epic Games library</p>
+                    <a id="epic-open-btn" href="#" target="_blank" rel="noopener noreferrer">Open Epic page</a>
+                    <div class="form-group">
+                        <label for="epic-code-input">Paste authorization code:</label>
+                        <input type="text" id="epic-code-input" placeholder="authorizationCode value from Epic page">
+                    </div>
+                    <button id="epic-connect-btn">Connect Epic</button>
+                    <div id="epic-error" style="color: red"></div>
+                </section>
+                <section id="epic-library" style="display:none">
+                    <p id="epic-game-count">Epic: 0 games</p>
+                    <div id="epic-games-grid"></div>
+                    <button id="epic-disconnect-btn">Disconnect Epic</button>
+                </section>
+                <section id="itch-connect-section">
+                    <p>Connect your itch.io library</p>
+                    <a id="itch-open-btn" href="/api/itch/init">Connect itch.io</a>
+                    <div id="itch-error" style="color: red"></div>
+                </section>
+                <section id="itch-library" style="display:none">
+                    <p id="itch-game-count">itch.io: 0 games</p>
+                    <div id="itch-games-grid"></div>
+                    <button id="itch-disconnect-btn">Disconnect itch.io</button>
+                </section>
+            </div>
+            <div id="bundles-view" style="display:none">
+                <div id="bundles-loading" style="display:none">Loading bundles…</div>
+                <div id="bundles-error" style="display:none; color:red"></div>
+                <div id="bundles-list"></div>
+            </div>
             <button id="logout-btn">Sign Out</button>
         </div>
     </main>
@@ -67,6 +78,7 @@
         import { steamManager } from './js/steam.js';
         import { epicManager } from './js/epic.js';
         import { itchManager } from './js/itch.js';
+        import { bundleManager } from './js/bundles.js';
 
         const appContainer = document.getElementById('app-container');
         const loginForm = document.getElementById('login-form');
@@ -95,12 +107,88 @@
         const itchGameCount = document.getElementById('itch-game-count');
         const itchError = document.getElementById('itch-error');
 
+        const libraryView = document.getElementById('library-view');
+        const bundlesView = document.getElementById('bundles-view');
+        const tabLibrary = document.getElementById('tab-library');
+        const tabBundles = document.getElementById('tab-bundles');
+
         const pageParams = new URLSearchParams(window.location.search);
         const pendingSteamCallback = pageParams.get('steam_connected') === '1';
         const pendingSteamError = pageParams.get('steam_error') ?? null;
         const pendingItchCallback = window.location.hash.includes('access_token') || window.location.hash.includes('error=');
 
         epicOpenBtn.href = epicManager.getRedirectUrl();
+
+        tabLibrary.addEventListener('click', () => {
+            libraryView.style.display = '';
+            bundlesView.style.display = 'none';
+            tabLibrary.classList.add('tab-active');
+            tabBundles.classList.remove('tab-active');
+        });
+
+        tabBundles.addEventListener('click', async () => {
+            libraryView.style.display = 'none';
+            bundlesView.style.display = '';
+            tabLibrary.classList.remove('tab-active');
+            tabBundles.classList.add('tab-active');
+            await loadBundles();
+        });
+
+        async function loadBundles() {
+            const bundlesLoading = document.getElementById('bundles-loading');
+            const bundlesError = document.getElementById('bundles-error');
+            const bundlesList = document.getElementById('bundles-list');
+
+            bundlesLoading.style.display = '';
+            bundlesError.style.display = 'none';
+            bundlesList.innerHTML = '';
+
+            try {
+                const state = authManager.getState();
+                const ownedSet = bundleManager.buildOwnedSet(state || {});
+                const rawBundles = await bundleManager.fetchBundles();
+                const bundles = bundleManager.computeOwnershipSummary(rawBundles, ownedSet);
+
+                bundlesLoading.style.display = 'none';
+
+                if (bundles.length === 0) {
+                    bundlesList.textContent = 'No active bundles found.';
+                    return;
+                }
+
+                bundles.forEach(bundle => {
+                    const card = document.createElement('a');
+                    card.className = 'bundle-card';
+                    card.href = bundle.url;
+                    card.target = '_blank';
+                    card.rel = 'noopener noreferrer';
+
+                    const name = document.createElement('h3');
+                    name.className = 'bundle-name';
+                    name.textContent = bundle.name;
+
+                    const endDate = document.createElement('p');
+                    endDate.className = 'bundle-end-date';
+                    const d = new Date(bundle.end_date);
+                    endDate.textContent = `Ends ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+
+                    const ownership = document.createElement('p');
+                    ownership.className = 'bundle-ownership';
+                    const owned = bundle.owned_count ?? '—';
+                    const total = bundle.total_count ?? '—';
+                    ownership.textContent = `${total} games — ${owned} you don't own`;
+
+                    card.appendChild(name);
+                    card.appendChild(endDate);
+                    card.appendChild(ownership);
+                    bundlesList.appendChild(card);
+                });
+            } catch (err) {
+                bundlesLoading.style.display = 'none';
+                bundlesError.textContent = err.message || 'Failed to load bundles';
+                bundlesError.style.display = '';
+            }
+        }
 
         function renderSteamGames(games) {
             steamGamesGrid.innerHTML = '';
@@ -193,6 +281,10 @@
             itchLibrary.style.display = 'none';
             itchConnectSection.style.display = '';
             itchError.textContent = '';
+            libraryView.style.display = '';
+            bundlesView.style.display = 'none';
+            tabLibrary.classList.add('tab-active');
+            tabBundles.classList.remove('tab-active');
         });
 
         document.addEventListener('steam:connected', (event) => {

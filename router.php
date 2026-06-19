@@ -42,6 +42,11 @@ if (str_starts_with($path, '/api/itch/library')) {
     exit;
 }
 
+if (str_starts_with($path, '/api/bundles')) {
+    require __DIR__ . '/api/bundles.php';
+    exit;
+}
+
 if (file_exists(__DIR__ . $path) && is_file(__DIR__ . $path)) {
     return false;
 }
