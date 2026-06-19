@@ -222,9 +222,89 @@ main {
 .manage-platforms-content {
   padding: 16px;
   border-top: 1px solid var(--color-border);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 700px) {
+  .manage-platforms-content {
+    grid-template-columns: 1fr;
+  }
+}
+
+.platform-connect-card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
+}
+
+.platform-instructions {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.platform-instructions code {
+  background: var(--color-border);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.8rem;
+}
+
+.platform-link {
+  font-size: 0.85rem;
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.platform-link:hover {
+  text-decoration: underline;
+}
+
+.platform-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  min-height: 44px;
+}
+
+.platform-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.platform-btn {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+}
+
+.platform-btn-disconnect {
+  background-color: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
+.platform-btn-disconnect:hover {
+  background-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.platform-error {
+  color: var(--color-danger);
+  font-size: 0.85rem;
+  min-height: 0;
 }
 
 #library-grid {
