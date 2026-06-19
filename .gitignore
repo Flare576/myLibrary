@@ -1,5 +1,5 @@
 # Don't commit your secrets
-config.php
+config*.php
 # Don't commit debug configs
 php.ini
 # Don't commit your script, even if it's sanitized

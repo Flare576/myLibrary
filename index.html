@@ -48,6 +48,16 @@
                 <div id="epic-games-grid"></div>
                 <button id="epic-disconnect-btn">Disconnect Epic</button>
             </section>
+            <section id="itch-connect-section">
+                <p>Connect your itch.io library</p>
+                <a id="itch-open-btn" href="/api/itch/init">Connect itch.io</a>
+                <div id="itch-error" style="color: red"></div>
+            </section>
+            <section id="itch-library" style="display:none">
+                <p id="itch-game-count">itch.io: 0 games</p>
+                <div id="itch-games-grid"></div>
+                <button id="itch-disconnect-btn">Disconnect itch.io</button>
+            </section>
             <button id="logout-btn">Sign Out</button>
         </div>
     </main>
@@ -56,6 +66,7 @@
         import { authManager } from './js/auth.js';
         import { steamManager } from './js/steam.js';
         import { epicManager } from './js/epic.js';
+        import { itchManager } from './js/itch.js';
 
         const appContainer = document.getElementById('app-container');
         const loginForm = document.getElementById('login-form');
@@ -77,10 +88,17 @@
         const epicGamesGrid = document.getElementById('epic-games-grid');
         const epicGameCount = document.getElementById('epic-game-count');
         const epicError = document.getElementById('epic-error');
+        const itchOpenBtn = document.getElementById('itch-open-btn');
+        const itchConnectSection = document.getElementById('itch-connect-section');
+        const itchLibrary = document.getElementById('itch-library');
+        const itchGamesGrid = document.getElementById('itch-games-grid');
+        const itchGameCount = document.getElementById('itch-game-count');
+        const itchError = document.getElementById('itch-error');
 
         const pageParams = new URLSearchParams(window.location.search);
         const pendingSteamCallback = pageParams.get('steam_connected') === '1';
         const pendingSteamError = pageParams.get('steam_error') ?? null;
+        const pendingItchCallback = window.location.hash.includes('access_token') || window.location.hash.includes('error=');
 
         epicOpenBtn.href = epicManager.getRedirectUrl();
 
@@ -114,6 +132,21 @@
             epicGameCount.textContent = `Epic: ${n} games`;
         }
 
+        function renderItchGames(games) {
+            itchGamesGrid.innerHTML = '';
+            (games || []).forEach(game => {
+                const card = document.createElement('div');
+                card.className = 'game-card';
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'game-name';
+                nameSpan.textContent = game.name;
+                card.appendChild(nameSpan);
+                itchGamesGrid.appendChild(card);
+            });
+            const n = (games || []).length;
+            itchGameCount.textContent = `itch.io: ${n} games`;
+        }
+
         document.addEventListener('auth:login', async (event) => {
             const { username, state } = event.detail;
             appContainer.dataset.authState = 'authenticated';
@@ -138,6 +171,14 @@
                 epicConnectSection.style.display = 'none';
                 epicLibrary.style.display = '';
             }
+
+            if (pendingItchCallback) {
+                await itchManager.handleCallback(authManager);
+            } else if (state.itch) {
+                renderItchGames(state.itch.games);
+                itchConnectSection.style.display = 'none';
+                itchLibrary.style.display = '';
+            }
         });
 
         document.addEventListener('auth:logout', () => {
@@ -149,6 +190,9 @@
             epicLibrary.style.display = 'none';
             epicConnectSection.style.display = '';
             epicError.textContent = '';
+            itchLibrary.style.display = 'none';
+            itchConnectSection.style.display = '';
+            itchError.textContent = '';
         });
 
         document.addEventListener('steam:connected', (event) => {
@@ -186,6 +230,23 @@
             epicError.textContent = msg;
         });
 
+        document.addEventListener('itch:connected', (event) => {
+            const { games } = event.detail;
+            renderItchGames(games);
+            itchConnectSection.style.display = 'none';
+            itchLibrary.style.display = '';
+        });
+
+        document.addEventListener('itch:disconnected', () => {
+            itchLibrary.style.display = 'none';
+            itchConnectSection.style.display = '';
+        });
+
+        document.addEventListener('itch:error', (event) => {
+            const msg = event.detail?.message || 'itch.io connection failed';
+            itchError.textContent = msg;
+        });
+
         steamConnectBtn.addEventListener('click', () => steamManager.connectSteam());
         document.getElementById('steam-disconnect-btn').addEventListener('click', () => {
             steamManager.disconnectSteam(authManager);
@@ -194,6 +255,10 @@
         epicConnectBtn.addEventListener('click', () => epicManager.connectEpic(epicCodeInput.value.trim(), authManager));
         document.getElementById('epic-disconnect-btn').addEventListener('click', () => {
             epicManager.disconnectEpic(authManager);
+        });
+
+        document.getElementById('itch-disconnect-btn').addEventListener('click', () => {
+            itchManager.disconnectItch(authManager);
         });
 
         const SESSION_KEY = 'ml_session';

@@ -27,6 +27,21 @@ if (str_starts_with($path, '/api/epic/exchange')) {
     exit;
 }
 
+if (str_starts_with($path, '/api/itch/init')) {
+    require __DIR__ . '/api/itch/init.php';
+    exit;
+}
+
+if (str_starts_with($path, '/api/itch/callback')) {
+    require __DIR__ . '/api/itch/callback.php';
+    exit;
+}
+
+if (str_starts_with($path, '/api/itch/library')) {
+    require __DIR__ . '/api/itch/library.php';
+    exit;
+}
+
 if (file_exists(__DIR__ . $path) && is_file(__DIR__ . $path)) {
     return false;
 }

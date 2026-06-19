@@ -390,4 +390,109 @@ test.describe('T-HTML: index.html auth state machine', () => {
     await expect(page.locator('#epic-library')).toBeHidden();
     await expect(page.locator('#epic-connect-section')).toBeVisible();
   });
+
+  test('T-HTML-15: itch connect section visible after login, itch library hidden', async ({ page }) => {
+    await page.route(SYNC_PATTERN, route => route.fulfill({
+      status: 404,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'Not found' }),
+    }));
+
+    await page.goto(BASE);
+    await page.fill('#username', 'testuser');
+    await page.fill('#passphrase', 'testpass');
+    await page.click('#login-btn');
+
+    await expect(page.locator('#authenticated-view')).toBeVisible();
+    await expect(page.locator('#itch-connect-section')).toBeVisible();
+    await expect(page.locator('#itch-library')).toBeHidden();
+  });
+
+  test('T-HTML-16: itch:connected event renders itch library section and hides connect section', async ({ page }) => {
+    await page.route(SYNC_PATTERN, route => route.fulfill({
+      status: 404,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'Not found' }),
+    }));
+
+    await page.goto(BASE);
+    await page.fill('#username', 'testuser');
+    await page.fill('#passphrase', 'testpass');
+    await page.click('#login-btn');
+    await expect(page.locator('#authenticated-view')).toBeVisible();
+
+    await page.evaluate(() => {
+      document.dispatchEvent(new CustomEvent('itch:connected', {
+        detail: {
+          token: 'tok',
+          games: [{ appid: 1, name: 'Celeste', platform: 'itch' }],
+        },
+      }));
+    });
+
+    await expect(page.locator('#itch-library')).toBeVisible();
+    await expect(page.locator('#itch-connect-section')).toBeHidden();
+    // Oracle: itch.io game count always plural — no singular special-case
+    await expect(page.locator('#itch-game-count')).toContainText('games');
+  });
+
+  test('T-HTML-17: itch:error event displays error message', async ({ page }) => {
+    await page.route(SYNC_PATTERN, route => route.fulfill({
+      status: 404,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'Not found' }),
+    }));
+
+    await page.goto(BASE);
+    await page.fill('#username', 'testuser');
+    await page.fill('#passphrase', 'testpass');
+    await page.click('#login-btn');
+    await expect(page.locator('#authenticated-view')).toBeVisible();
+
+    await page.evaluate(() => {
+      document.dispatchEvent(new CustomEvent('itch:error', {
+        detail: { message: 'test itch error' },
+      }));
+    });
+
+    await expect(page.locator('#itch-error')).toContainText('test itch error');
+  });
+
+  test('T-HTML-18: itch disconnect returns to connect-section state', async ({ page }) => {
+    await page.route(SYNC_PATTERN, route => route.fulfill({
+      status: 404,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'Not found' }),
+    }));
+
+    await page.goto(BASE);
+    await page.fill('#username', 'testuser');
+    await page.fill('#passphrase', 'testpass');
+    await page.click('#login-btn');
+    await expect(page.locator('#authenticated-view')).toBeVisible();
+
+    await page.evaluate(() => {
+      document.dispatchEvent(new CustomEvent('itch:connected', {
+        detail: {
+          token: 'tok',
+          games: [{ appid: 1, name: 'Celeste', platform: 'itch' }],
+        },
+      }));
+    });
+    await expect(page.locator('#itch-library')).toBeVisible();
+    await expect(page.locator('#itch-connect-section')).toBeHidden();
+
+    await page.route(SYNC_PATTERN, route => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: true }),
+      headers: { ETag: '"after-itch-disconnect"' },
+    }));
+
+    await page.click('#itch-disconnect-btn');
+
+    // Oracle: library hidden, connect section restored
+    await expect(page.locator('#itch-library')).toBeHidden();
+    await expect(page.locator('#itch-connect-section')).toBeVisible();
+  });
 });
