@@ -58,40 +58,43 @@
                     <details id="manage-platforms" open>
                         <summary>Manage Platforms</summary>
                         <div class="manage-platforms-content">
-                            <button id="steam-connect-btn">Connect Steam</button>
-                            <div id="steam-error" style="color: red"></div>
-                            <section id="steam-library" style="display:none">
-                                <p id="steam-game-count">Steam: 0 games</p>
-                                <div id="steam-games-grid" style="display:none"></div>
-                                <button id="steam-disconnect-btn">Disconnect Steam</button>
-                            </section>
-                            
-                            <section id="epic-connect-section">
-                                <p>Connect your Epic Games library</p>
-                                <a id="epic-open-btn" href="#" target="_blank" rel="noopener noreferrer">Open Epic page</a>
-                                <div class="form-group">
-                                    <label for="epic-code-input">Paste authorization code:</label>
-                                    <input type="text" id="epic-code-input" placeholder="authorizationCode value from Epic page">
-                                </div>
-                                <button id="epic-connect-btn">Connect Epic</button>
-                                <div id="epic-error" style="color: red"></div>
-                            </section>
-                            <section id="epic-library" style="display:none">
-                                <p id="epic-game-count">Epic: 0 games</p>
-                                <div id="epic-games-grid" style="display:none"></div>
-                                <button id="epic-disconnect-btn">Disconnect Epic</button>
-                            </section>
-                            
-                            <section id="itch-connect-section">
-                                <p>Connect your itch.io library</p>
-                                <a id="itch-open-btn" href="/api/itch/init">Connect itch.io</a>
-                                <div id="itch-error" style="color: red"></div>
-                            </section>
-                            <section id="itch-library" style="display:none">
-                                <p id="itch-game-count">itch.io: 0 games</p>
-                                <div id="itch-games-grid" style="display:none"></div>
-                                <button id="itch-disconnect-btn">Disconnect itch.io</button>
-                            </section>
+                            <div class="platform-connect-card">
+                                <span class="platform-badge platform-steam">Steam</span>
+                                <button id="steam-connect-btn" class="platform-btn">Connect Steam</button>
+                                <div id="steam-error" class="platform-error"></div>
+                                <section id="steam-library" style="display:none">
+                                    <p id="steam-game-count">Steam: 0 games</p>
+                                    <button id="steam-disconnect-btn" class="platform-btn platform-btn-disconnect">Disconnect</button>
+                                </section>
+                            </div>
+
+                            <div class="platform-connect-card">
+                                <span class="platform-badge platform-epic">Epic</span>
+                                <section id="epic-connect-section">
+                                    <p class="platform-instructions">Log into epicgames.com, then open the link below. Copy the <code>authorizationCode</code> value from the JSON and paste it here.</p>
+                                    <a id="epic-open-btn" href="#" target="_blank" rel="noopener noreferrer" class="platform-link">Open Epic authorization page ↗</a>
+                                    <input type="text" id="epic-code-input" class="platform-input" placeholder="Paste authorizationCode here…">
+                                    <button id="epic-connect-btn" class="platform-btn">Connect Epic</button>
+                                    <div id="epic-error" class="platform-error"></div>
+                                </section>
+                                <section id="epic-library" style="display:none">
+                                    <p id="epic-game-count">Epic: 0 games</p>
+                                    <button id="epic-disconnect-btn" class="platform-btn platform-btn-disconnect">Disconnect</button>
+                                </section>
+                            </div>
+
+                            <div class="platform-connect-card">
+                                <span class="platform-badge platform-itch">itch.io</span>
+                                <section id="itch-connect-section">
+                                    <p class="platform-instructions">Connect your itch.io account to import your owned games library.</p>
+                                    <button id="itch-connect-btn" class="platform-btn">Connect itch.io</button>
+                                    <div id="itch-error" class="platform-error"></div>
+                                </section>
+                                <section id="itch-library" style="display:none">
+                                    <p id="itch-game-count">itch.io: 0 games</p>
+                                    <button id="itch-disconnect-btn" class="platform-btn platform-btn-disconnect">Disconnect</button>
+                                </section>
+                            </div>
                         </div>
                     </details>
 
@@ -130,20 +133,16 @@
         const passphraseInput = document.getElementById('passphrase');
         const steamConnectBtn = document.getElementById('steam-connect-btn');
         const steamLibrary = document.getElementById('steam-library');
-        const steamGamesGrid = document.getElementById('steam-games-grid');
         const steamGameCount = document.getElementById('steam-game-count');
         const epicOpenBtn = document.getElementById('epic-open-btn');
         const epicConnectBtn = document.getElementById('epic-connect-btn');
         const epicCodeInput = document.getElementById('epic-code-input');
         const epicConnectSection = document.getElementById('epic-connect-section');
         const epicLibrary = document.getElementById('epic-library');
-        const epicGamesGrid = document.getElementById('epic-games-grid');
         const epicGameCount = document.getElementById('epic-game-count');
         const epicError = document.getElementById('epic-error');
-        const itchOpenBtn = document.getElementById('itch-open-btn');
         const itchConnectSection = document.getElementById('itch-connect-section');
         const itchLibrary = document.getElementById('itch-library');
-        const itchGamesGrid = document.getElementById('itch-games-grid');
         const itchGameCount = document.getElementById('itch-game-count');
         const itchError = document.getElementById('itch-error');
 
@@ -538,6 +537,9 @@
             epicManager.disconnectEpic(authManager);
         });
 
+        document.getElementById('itch-connect-btn').addEventListener('click', () => {
+            window.location.href = '/api/itch/init';
+        });
         document.getElementById('itch-disconnect-btn').addEventListener('click', () => {
             itchManager.disconnectItch(authManager);
         });
