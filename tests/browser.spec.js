@@ -281,4 +281,113 @@ test.describe('T-HTML: index.html auth state machine', () => {
     // Oracle: URL cleaned after failed callback
     await expect(page).toHaveURL(BASE + '/');
   });
+
+  test('T-HTML-11: Epic connect section visible after login, Epic library hidden', async ({ page }) => {
+    await page.route(SYNC_PATTERN, route => route.fulfill({
+      status: 404,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'Not found' }),
+    }));
+
+    await page.goto(BASE);
+    await page.fill('#username', 'testuser');
+    await page.fill('#passphrase', 'testpass');
+    await page.click('#login-btn');
+
+    await expect(page.locator('#authenticated-view')).toBeVisible();
+    await expect(page.locator('#epic-connect-section')).toBeVisible();
+    await expect(page.locator('#epic-library')).toBeHidden();
+  });
+
+  test('T-HTML-12: epic:connected event renders Epic library section and hides connect section', async ({ page }) => {
+    await page.route(SYNC_PATTERN, route => route.fulfill({
+      status: 404,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'Not found' }),
+    }));
+
+    await page.goto(BASE);
+    await page.fill('#username', 'testuser');
+    await page.fill('#passphrase', 'testpass');
+    await page.click('#login-btn');
+    await expect(page.locator('#authenticated-view')).toBeVisible();
+
+    await page.evaluate(() => {
+      document.dispatchEvent(new CustomEvent('epic:connected', {
+        detail: {
+          games: [{ appid: 'AAA', name: 'Fortnite', platform: 'epic' }],
+          accountId: 'acct123',
+        },
+      }));
+    });
+
+    await expect(page.locator('#epic-library')).toBeVisible();
+    await expect(page.locator('#epic-connect-section')).toBeHidden();
+    // Oracle: always plural for Epic ("1 games"), no singular special-case
+    await expect(page.locator('#epic-game-count')).toHaveText('Epic: 1 games');
+    await expect(page.locator('.game-card')).toHaveCount(1);
+    await expect(page.locator('.game-card')).toContainText('Fortnite');
+  });
+
+  test('T-HTML-13: epic:error event displays error message', async ({ page }) => {
+    await page.route(SYNC_PATTERN, route => route.fulfill({
+      status: 404,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'Not found' }),
+    }));
+
+    await page.goto(BASE);
+    await page.fill('#username', 'testuser');
+    await page.fill('#passphrase', 'testpass');
+    await page.click('#login-btn');
+    await expect(page.locator('#authenticated-view')).toBeVisible();
+
+    await page.evaluate(() => {
+      document.dispatchEvent(new CustomEvent('epic:error', {
+        detail: { message: 'Epic connect failed' },
+      }));
+    });
+
+    await expect(page.locator('#epic-error')).toHaveText('Epic connect failed');
+  });
+
+  test('T-HTML-14: Epic disconnect returns to connect-section state', async ({ page }) => {
+    await page.route(SYNC_PATTERN, route => route.fulfill({
+      status: 404,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'Not found' }),
+    }));
+
+    await page.goto(BASE);
+    await page.fill('#username', 'testuser');
+    await page.fill('#passphrase', 'testpass');
+    await page.click('#login-btn');
+    await expect(page.locator('#authenticated-view')).toBeVisible();
+
+    // Connect Epic via event (same pattern as T-HTML-12)
+    await page.evaluate(() => {
+      document.dispatchEvent(new CustomEvent('epic:connected', {
+        detail: {
+          games: [{ appid: 'AAA', name: 'Fortnite', platform: 'epic' }],
+          accountId: 'acct123',
+        },
+      }));
+    });
+    await expect(page.locator('#epic-library')).toBeVisible();
+    await expect(page.locator('#epic-connect-section')).toBeHidden();
+
+    // Route the saveState POST (disconnect writes back the blob)
+    await page.route(SYNC_PATTERN, route => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: true }),
+      headers: { ETag: '"after-disconnect"' },
+    }));
+
+    await page.click('#epic-disconnect-btn');
+
+    // Oracle: library hidden, connect section restored
+    await expect(page.locator('#epic-library')).toBeHidden();
+    await expect(page.locator('#epic-connect-section')).toBeVisible();
+  });
 });

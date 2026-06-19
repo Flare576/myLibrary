@@ -33,6 +33,21 @@
                 <div id="steam-games-grid"></div>
                 <button id="steam-disconnect-btn">Disconnect Steam</button>
             </section>
+            <section id="epic-connect-section">
+                <p>Connect your Epic Games library</p>
+                <a id="epic-open-btn" href="#" target="_blank" rel="noopener noreferrer">Open Epic page</a>
+                <div class="form-group">
+                    <label for="epic-code-input">Paste authorization code:</label>
+                    <input type="text" id="epic-code-input" placeholder="authorizationCode value from Epic page">
+                </div>
+                <button id="epic-connect-btn">Connect Epic</button>
+                <div id="epic-error" style="color: red"></div>
+            </section>
+            <section id="epic-library" style="display:none">
+                <p id="epic-game-count">Epic: 0 games</p>
+                <div id="epic-games-grid"></div>
+                <button id="epic-disconnect-btn">Disconnect Epic</button>
+            </section>
             <button id="logout-btn">Sign Out</button>
         </div>
     </main>
@@ -40,6 +55,7 @@
     <script type="module">
         import { authManager } from './js/auth.js';
         import { steamManager } from './js/steam.js';
+        import { epicManager } from './js/epic.js';
 
         const appContainer = document.getElementById('app-container');
         const loginForm = document.getElementById('login-form');
@@ -53,10 +69,20 @@
         const steamLibrary = document.getElementById('steam-library');
         const steamGamesGrid = document.getElementById('steam-games-grid');
         const steamGameCount = document.getElementById('steam-game-count');
+        const epicOpenBtn = document.getElementById('epic-open-btn');
+        const epicConnectBtn = document.getElementById('epic-connect-btn');
+        const epicCodeInput = document.getElementById('epic-code-input');
+        const epicConnectSection = document.getElementById('epic-connect-section');
+        const epicLibrary = document.getElementById('epic-library');
+        const epicGamesGrid = document.getElementById('epic-games-grid');
+        const epicGameCount = document.getElementById('epic-game-count');
+        const epicError = document.getElementById('epic-error');
 
         const pageParams = new URLSearchParams(window.location.search);
         const pendingSteamCallback = pageParams.get('steam_connected') === '1';
         const pendingSteamError = pageParams.get('steam_error') ?? null;
+
+        epicOpenBtn.href = epicManager.getRedirectUrl();
 
         function renderSteamGames(games) {
             steamGamesGrid.innerHTML = '';
@@ -71,6 +97,21 @@
             });
             const n = (games || []).length;
             steamGameCount.textContent = `Steam: ${n} ${n === 1 ? 'game' : 'games'}`;
+        }
+
+        function renderEpicGames(games) {
+            epicGamesGrid.innerHTML = '';
+            (games || []).forEach(game => {
+                const card = document.createElement('div');
+                card.className = 'game-card';
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'game-name';
+                nameSpan.textContent = game.name;
+                card.appendChild(nameSpan);
+                epicGamesGrid.appendChild(card);
+            });
+            const n = (games || []).length;
+            epicGameCount.textContent = `Epic: ${n} games`;
         }
 
         document.addEventListener('auth:login', async (event) => {
@@ -91,6 +132,12 @@
                 steamConnectBtn.style.display = 'none';
                 steamLibrary.style.display = '';
             }
+
+            if (state.epic) {
+                renderEpicGames(state.epic.games);
+                epicConnectSection.style.display = 'none';
+                epicLibrary.style.display = '';
+            }
         });
 
         document.addEventListener('auth:logout', () => {
@@ -99,6 +146,9 @@
             loginError.textContent = '';
             steamConnectBtn.style.display = '';
             steamLibrary.style.display = 'none';
+            epicLibrary.style.display = 'none';
+            epicConnectSection.style.display = '';
+            epicError.textContent = '';
         });
 
         document.addEventListener('steam:connected', (event) => {
@@ -119,9 +169,31 @@
             if (errDiv) errDiv.textContent = msg;
         });
 
+        document.addEventListener('epic:connected', (event) => {
+            const { games } = event.detail;
+            renderEpicGames(games);
+            epicConnectSection.style.display = 'none';
+            epicLibrary.style.display = '';
+        });
+
+        document.addEventListener('epic:disconnected', () => {
+            epicLibrary.style.display = 'none';
+            epicConnectSection.style.display = '';
+        });
+
+        document.addEventListener('epic:error', (event) => {
+            const msg = event.detail?.message || 'Epic connection failed';
+            epicError.textContent = msg;
+        });
+
         steamConnectBtn.addEventListener('click', () => steamManager.connectSteam());
         document.getElementById('steam-disconnect-btn').addEventListener('click', () => {
             steamManager.disconnectSteam(authManager);
+        });
+
+        epicConnectBtn.addEventListener('click', () => epicManager.connectEpic(epicCodeInput.value.trim(), authManager));
+        document.getElementById('epic-disconnect-btn').addEventListener('click', () => {
+            epicManager.disconnectEpic(authManager);
         });
 
         const SESSION_KEY = 'ml_session';

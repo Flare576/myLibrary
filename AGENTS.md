@@ -18,6 +18,11 @@ Target device: Steam Deck (1280×800, landscape, controller-friendly).
 ### Key Principle
 Server is a dumb proxy + blob store. All sensitive data (game libraries, OAuth tokens) lives client-side, encrypted with a key the server never sees (WebCrypto AES-GCM, PBKDF2-derived key).
 
+### SessionStore (intentional tradeoff)
+Steam's OpenID flow navigates away from the page, losing in-memory credentials. To survive the redirect, `index.html` saves `username` + `passphrase` to `sessionStorage` on login and restores them on page load. `sessionStorage` is tab-scoped and cleared on tab close — not persisted across sessions.
+
+This stores credentials in plaintext in the browser. For this project (personal tool, no third-party scripts, no CDN) the risk is acceptable. Do not change this to `localStorage`. Do not "fix" it without understanding why it exists.
+
 ---
 
 ## Current Files (v2 — Phase 0 complete)

@@ -1,17 +1,14 @@
 /**
  * schema.spec.js — DB schema regression tests
  *
- * Guards against schema drift between db/schema.sql and the live DB.
+ * Guards against schema drift: verifies that the live DB matches what
+ * db/schema.sql declares, specifically that user_blobs.blob is MEDIUMTEXT
+ * (not TEXT) so large game libraries (500+ games encrypted) don't get
+ * silently truncated at the 64KB TEXT limit.
  *
- * Background: Phase 1 changed user_blobs.blob from TEXT (64KB max) to
- * MEDIUMTEXT (~16MB) to support large game libraries. The fix lives only in
- * the live DB — schema.sql still declares TEXT. If anyone reloads the schema
- * the bug silently returns. This test catches that regression.
- *
- * Oracle: user_blobs.blob must be able to store a blob larger than 65535 bytes
- * (the TEXT column limit) and return it byte-identical on GET. Any column type
- * narrower than MEDIUMTEXT will silently truncate and the GET body will not
- * match the POST body.
+ * Oracle: user_blobs.blob must store a blob larger than 65535 bytes and
+ * return it byte-identical on GET. Any column type narrower than MEDIUMTEXT
+ * will silently truncate and the GET body will not match the POST body.
  */
 
 const { test, expect } = require('@playwright/test');

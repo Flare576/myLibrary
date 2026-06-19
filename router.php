@@ -22,6 +22,11 @@ if (str_starts_with($path, '/api/steam/games')) {
     exit;
 }
 
+if (str_starts_with($path, '/api/epic/exchange')) {
+    require __DIR__ . '/api/epic/exchange.php';
+    exit;
+}
+
 if (file_exists(__DIR__ . $path) && is_file(__DIR__ . $path)) {
     return false;
 }
