@@ -68,6 +68,12 @@
                 <div id="bundles-loading" style="display:none">Loading bundles…</div>
                 <div id="bundles-error" style="display:none; color:red"></div>
                 <div id="bundles-list"></div>
+                <div id="bundle-detail" style="display:none">
+                    <button id="bundle-detail-back">← Back to bundles</button>
+                    <div id="bundle-detail-loading" style="display:none">Loading…</div>
+                    <div id="bundle-detail-error" style="display:none; color:red"></div>
+                    <div id="bundle-detail-content"></div>
+                </div>
             </div>
             <button id="logout-btn">Sign Out</button>
         </div>
@@ -124,6 +130,8 @@
             bundlesView.style.display = 'none';
             tabLibrary.classList.add('tab-active');
             tabBundles.classList.remove('tab-active');
+            document.getElementById('bundles-list').style.display = '';
+            document.getElementById('bundle-detail').style.display = 'none';
         });
 
         tabBundles.addEventListener('click', async () => {
@@ -157,6 +165,9 @@
                 }
 
                 bundles.forEach(bundle => {
+                    const cardWrapper = document.createElement('div');
+                    cardWrapper.className = 'bundle-card-wrapper';
+
                     const card = document.createElement('a');
                     card.className = 'bundle-card';
                     card.href = bundle.url;
@@ -174,14 +185,24 @@
 
                     const ownership = document.createElement('p');
                     ownership.className = 'bundle-ownership';
-                    const owned = bundle.owned_count ?? '—';
+                    const owned = bundle.owned_count ?? null;
                     const total = bundle.total_count ?? '—';
-                    ownership.textContent = `${total} games — ${owned} you don't own`;
+                    ownership.textContent = owned !== null
+                        ? `${total} games — ${owned} you don't own`
+                        : `${total} games`;
 
                     card.appendChild(name);
                     card.appendChild(endDate);
                     card.appendChild(ownership);
-                    bundlesList.appendChild(card);
+
+                    const detailBtn = document.createElement('button');
+                    detailBtn.className = 'bundle-detail-btn';
+                    detailBtn.dataset.slug = bundle.slug;
+                    detailBtn.textContent = 'Details';
+
+                    cardWrapper.appendChild(card);
+                    cardWrapper.appendChild(detailBtn);
+                    bundlesList.appendChild(cardWrapper);
                 });
             } catch (err) {
                 bundlesLoading.style.display = 'none';
@@ -189,6 +210,85 @@
                 bundlesError.style.display = '';
             }
         }
+
+        async function loadBundleDetail(slug) {
+            const bundlesList = document.getElementById('bundles-list');
+            const detailPanel = document.getElementById('bundle-detail');
+            const detailLoading = document.getElementById('bundle-detail-loading');
+            const detailError = document.getElementById('bundle-detail-error');
+            const detailContent = document.getElementById('bundle-detail-content');
+
+            bundlesList.style.display = 'none';
+            detailPanel.style.display = '';
+            detailLoading.style.display = '';
+            detailError.style.display = 'none';
+            detailContent.innerHTML = '';
+
+            try {
+                const state = authManager.getState();
+                const ownedSet = bundleManager.buildOwnedSet(state || {});
+                const raw = await bundleManager.fetchBundleDetail(slug);
+                const detail = bundleManager.computeDetailOwnership(raw, ownedSet);
+
+                detailLoading.style.display = 'none';
+
+                const header = document.createElement('div');
+                header.className = 'bundle-detail-header';
+                const unownedCount = detail.unowned_count;
+                const totalCount = detail.total_count;
+                const valueScore = detail.value_score;
+                header.innerHTML = `<p class="bundle-detail-summary">${unownedCount} of ${totalCount} games you don't own — $${valueScore.toFixed(2)} value</p>`;
+                detailContent.appendChild(header);
+
+                detail.tiers.forEach(tier => {
+                    if (tier.items.length === 0) return;
+                    const tierEl = document.createElement('section');
+                    tierEl.className = 'bundle-tier';
+                    const tierHeader = document.createElement('h3');
+                    tierHeader.className = 'bundle-tier-header';
+                    tierHeader.textContent = tier.price_label;
+                    tierEl.appendChild(tierHeader);
+
+                    tier.items.forEach(game => {
+                        const gameEl = document.createElement('div');
+                        gameEl.className = `bundle-game ${game.owned ? 'game-owned' : 'game-unowned'}`;
+                        gameEl.dataset.owned = game.owned ? 'true' : 'false';
+                        const nameSpan = document.createElement('span');
+                        nameSpan.className = 'game-name';
+                        nameSpan.textContent = game.human_name;
+                        const ownedSpan = document.createElement('span');
+                        ownedSpan.className = 'game-owned-indicator';
+                        ownedSpan.textContent = game.owned ? '✓ Owned' : 'Not owned';
+                        const msrpSpan = document.createElement('span');
+                        msrpSpan.className = 'game-msrp';
+                        msrpSpan.textContent = game.msrp > 0 ? `$${game.msrp.toFixed(2)}` : '';
+                        gameEl.appendChild(nameSpan);
+                        gameEl.appendChild(ownedSpan);
+                        gameEl.appendChild(msrpSpan);
+                        tierEl.appendChild(gameEl);
+                    });
+
+                    detailContent.appendChild(tierEl);
+                });
+            } catch (err) {
+                detailLoading.style.display = 'none';
+                detailError.textContent = err.message || 'Failed to load bundle details';
+                detailError.style.display = '';
+            }
+        }
+
+        document.getElementById('bundle-detail-back').addEventListener('click', () => {
+            document.getElementById('bundle-detail').style.display = 'none';
+            document.getElementById('bundles-list').style.display = '';
+        });
+
+        document.getElementById('bundles-list').addEventListener('click', (e) => {
+            const btn = e.target.closest('.bundle-detail-btn');
+            if (btn) {
+                e.preventDefault();
+                loadBundleDetail(btn.dataset.slug);
+            }
+        });
 
         function renderSteamGames(games) {
             steamGamesGrid.innerHTML = '';
@@ -285,6 +385,8 @@
             bundlesView.style.display = 'none';
             tabLibrary.classList.add('tab-active');
             tabBundles.classList.remove('tab-active');
+            document.getElementById('bundle-detail').style.display = 'none';
+            document.getElementById('bundles-list').style.display = '';
         });
 
         document.addEventListener('steam:connected', (event) => {

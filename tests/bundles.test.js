@@ -152,3 +152,70 @@ describe('bundleManager.buildOwnedSet', () => {
     expect(result).toBeInstanceOf(Set);
   });
 });
+
+describe('bundleManager.computeOwnershipSummary', () => {
+  function makeBundle(highlights) {
+    const b = { name: 'Test Bundle', slug: 'test_slug', url: 'https://www.humblebundle.com/games/test', end_date: '2099-01-01T00:00:00', start_date: '2026-01-01T00:00:00', category: 'bundle' };
+    if (highlights !== undefined) b.highlights = highlights;
+    return b;
+  }
+
+  it('T-BUN-SUMMARY-01: standard "N games" phrase extracts total_count', () => {
+    const result = bundleManager.computeOwnershipSummary([makeBundle(['10 games included'])], new Set());
+    expect(result[0].total_count).toBe(10);
+  });
+
+  it('T-BUN-SUMMARY-02: singular "1 game" phrase extracts total_count of 1', () => {
+    const result = bundleManager.computeOwnershipSummary([makeBundle(['1 game'])], new Set());
+    expect(result[0].total_count).toBe(1);
+  });
+
+  it('T-BUN-SUMMARY-03: highlight with no adjacent number before "games" returns null', () => {
+    const result = bundleManager.computeOwnershipSummary([makeBundle(['Win a bundle worth $10'])], new Set());
+    expect(result[0].total_count).toBeNull();
+  });
+
+  it('T-BUN-SUMMARY-04: empty highlights array returns null total_count', () => {
+    const result = bundleManager.computeOwnershipSummary([makeBundle([])], new Set());
+    expect(result[0].total_count).toBeNull();
+  });
+
+  it('T-BUN-SUMMARY-05: missing highlights key returns null total_count', () => {
+    const result = bundleManager.computeOwnershipSummary([makeBundle(undefined)], new Set());
+    expect(result[0].total_count).toBeNull();
+  });
+
+  it('T-BUN-SUMMARY-06: first matching highlight wins when multiple highlights present', () => {
+    // Oracle: ["5 bonus items", "12 games total"] — first highlight has no digit-games match,
+    // second matches "12 games" → total_count = 12.
+    const result = bundleManager.computeOwnershipSummary([makeBundle(['5 bonus items', '12 games total'])], new Set());
+    expect(result[0].total_count).toBe(12);
+  });
+
+  it('T-BUN-SUMMARY-07: matching is case-insensitive ("GAMES" and "Games" both match)', () => {
+    const upper = bundleManager.computeOwnershipSummary([makeBundle(['10 GAMES'])], new Set());
+    const mixed = bundleManager.computeOwnershipSummary([makeBundle(['10 Games'])], new Set());
+    expect(upper[0].total_count).toBe(10);
+    expect(mixed[0].total_count).toBe(10);
+  });
+
+  it('T-BUN-SUMMARY-08: owned_count is always null (detail not yet loaded)', () => {
+    const result = bundleManager.computeOwnershipSummary([makeBundle(['10 games'])], new Set(['portal']));
+    expect(result[0].owned_count).toBeNull();
+  });
+
+  it('T-BUN-SUMMARY-09: all original bundle properties are preserved in output', () => {
+    const bundle = makeBundle(['5 games']);
+    const result = bundleManager.computeOwnershipSummary([bundle], new Set());
+    expect(result[0].name).toBe(bundle.name);
+    expect(result[0].slug).toBe(bundle.slug);
+    expect(result[0].url).toBe(bundle.url);
+    expect(result[0].end_date).toBe(bundle.end_date);
+    expect(result[0].category).toBe(bundle.category);
+  });
+
+  it('T-BUN-SUMMARY-10: empty bundles array returns empty array', () => {
+    const result = bundleManager.computeOwnershipSummary([], new Set());
+    expect(result).toEqual([]);
+  });
+});

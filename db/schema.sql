@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS user_blobs (
 CREATE TABLE IF NOT EXISTS bundle_cache (
   slug VARCHAR(255) PRIMARY KEY,
   data JSON NOT NULL,                 -- full bundle data including tiers + games
+  detail JSON NULL,                   -- tier+game breakdown; NULL = not yet fetched
   cached_at TIMESTAMP DEFAULT NOW(),
   expires_at TIMESTAMP NOT NULL       -- = bundle end_date
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

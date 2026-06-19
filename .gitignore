@@ -2,6 +2,7 @@
 config*.php
 # Don't commit debug configs
 php.ini
+php.pid
 # Don't commit your script, even if it's sanitized
 deploy
 # Don't commit your local tags file

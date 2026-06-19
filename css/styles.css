@@ -178,3 +178,104 @@ main[data-auth-state="loading"] #authenticated-view {
   margin: 0;
   font-size: 0.85rem;
 }
+
+.bundle-card-wrapper {
+  margin-bottom: 10px;
+}
+
+.bundle-card-wrapper .bundle-card {
+  margin-bottom: 0;
+}
+
+.bundle-detail-btn {
+  width: auto;
+  background-color: transparent;
+  color: var(--color-accent);
+  border: 1px solid var(--color-accent);
+  padding: 5px 12px;
+  font-size: 0.8rem;
+  margin-top: 4px;
+  border-radius: 4px;
+}
+
+.bundle-detail-btn:hover {
+  background-color: var(--color-accent);
+  color: #fff;
+}
+
+#bundle-detail-back {
+  width: auto;
+  background-color: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  margin-bottom: 12px;
+}
+
+#bundle-detail-back:hover {
+  background-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.bundle-detail-header {
+  margin-bottom: 12px;
+}
+
+.bundle-detail-summary {
+  margin: 0 0 4px;
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+.bundle-tier {
+  margin-bottom: 16px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 10px;
+}
+
+.bundle-tier-header {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.bundle-game {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.9rem;
+}
+
+.bundle-game:last-child {
+  border-bottom: none;
+}
+
+.bundle-game .game-name {
+  flex: 1;
+}
+
+.game-owned-indicator {
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.game-owned .game-owned-indicator {
+  color: var(--color-success);
+}
+
+.game-unowned .game-owned-indicator {
+  color: var(--color-text-muted);
+}
+
+.game-msrp {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  min-width: 3.5rem;
+  text-align: right;
+}

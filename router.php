@@ -42,6 +42,12 @@ if (str_starts_with($path, '/api/itch/library')) {
     exit;
 }
 
+if (preg_match('#^/api/bundles/([^/]+)/detail$#', $path, $m)) {
+    $_SERVER['BUNDLE_SLUG'] = $m[1];
+    require __DIR__ . '/api/bundles/detail.php';
+    exit;
+}
+
 if (str_starts_with($path, '/api/bundles')) {
     require __DIR__ . '/api/bundles.php';
     exit;

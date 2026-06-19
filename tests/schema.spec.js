@@ -13,14 +13,19 @@
 
 const { test, expect } = require('@playwright/test');
 const { randomBytes } = require('crypto');
+const { execSync } = require('child_process');
+const path = require('path');
 
 const BASE = 'http://127.0.0.1:8181';
+const SOCKET = '/tmp/mysql.sock';
+const SCHEMA_FILE = path.resolve(__dirname, '../db/schema.sql');
+const SCRATCH_DB = 'mylibrary_schema_test';
 
 function freshUserId() {
   return 'test-' + randomBytes(8).toString('hex');
 }
 
-test.describe('T-SCHEMA: DB schema regression', () => {
+test.describe('T-SCHEMA: DB schema regression — live DB', () => {
   let api;
 
   test.beforeAll(async ({ playwright }) => {
@@ -65,6 +70,65 @@ test.describe('T-SCHEMA: DB schema regression', () => {
         'Round-tripped blob must be byte-identical to the posted blob. ' +
           'Mismatch means the column truncated the data (TEXT limit is 65535 bytes).',
       ).toBe(oversizePayload);
+    },
+  );
+});
+
+test.describe('T-SCHEMA: DB schema regression — fresh schema.sql load', () => {
+  test.beforeAll(() => {
+    execSync(`mariadb --socket=${SOCKET} -e "CREATE DATABASE IF NOT EXISTS ${SCRATCH_DB}"`);
+    execSync(`mariadb --socket=${SOCKET} ${SCRATCH_DB} < "${SCHEMA_FILE}"`);
+  });
+
+  test.afterAll(() => {
+    try {
+      execSync(`mariadb --socket=${SOCKET} -e "DROP DATABASE IF EXISTS ${SCRATCH_DB}"`);
+    } catch (_) {
+      // Best-effort cleanup
+    }
+  });
+
+  test('T-SCHEMA-02: schema.sql creates user_blobs.blob as MEDIUMTEXT (not TEXT)', () => {
+    const output = execSync(
+      `mariadb --socket=${SOCKET} ${SCRATCH_DB} -e "SHOW CREATE TABLE user_blobs\\G"`,
+    ).toString();
+
+    expect(
+      output.toLowerCase(),
+      'blob column must be mediumtext — TEXT would silently truncate blobs >64KB',
+    ).toMatch(/`blob`\s+mediumtext/);
+
+    const columnLine = output.split('\n').find(line => line.toLowerCase().includes('`blob`'));
+    expect(
+      columnLine?.toLowerCase(),
+      'blob column declaration must not be plain TEXT',
+    ).not.toMatch(/`blob`\s+text[^m]/);
+  });
+
+  test(
+    'T-SCHEMA-03: schema.sql creates bundle_cache.detail as a nullable column',
+    () => {
+      // Oracle: Phase 5 added `detail JSON NULL` to bundle_cache. If schema.sql is loaded
+      // on a fresh DB without this column, detail.php throws a DB error on every cache write.
+      const output = execSync(
+        `mariadb --socket=${SOCKET} ${SCRATCH_DB} -e "SHOW CREATE TABLE bundle_cache\\G"`,
+      ).toString();
+
+      expect(
+        output.toLowerCase(),
+        'bundle_cache must have a detail column',
+      ).toContain('`detail`');
+
+      const detailLine = output.split('\n').find(line => line.toLowerCase().includes('`detail`'));
+      expect(
+        detailLine,
+        'detail column must exist in bundle_cache',
+      ).toBeTruthy();
+
+      expect(
+        detailLine?.toLowerCase(),
+        'detail column must allow NULL (DEFAULT NULL)',
+      ).toContain('null');
     },
   );
 });

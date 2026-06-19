@@ -1,5 +1,5 @@
 /**
- * bundles.js — Bundle Browser module for MyLibrary Phase 4
+ * bundles.js — Bundle Browser module for MyLibrary Phase 4/5
  *
  * Handles fetching the active Humble Bundle listing from /api/bundles,
  * building a normalized owned-game name set from connected platform libraries,
@@ -8,6 +8,9 @@
  * Phase 4 note: The bundle listing endpoint returns metadata only (name, slug,
  * url, end_date, start_date, category). Per-game detail is a Phase 5 concern.
  * Until then, owned_count and total_count are null in the summary.
+ *
+ * Phase 5 note: fetchBundleDetail(slug) fetches per-game tier data.
+ * computeDetailOwnership(detail, ownedNames) enriches that data with ownership.
  *
  * No UI logic lives here — only data and network concerns.
  */
@@ -73,22 +76,47 @@ export const bundleManager = {
     return names;
   },
 
-  /**
-   * Compute an ownership summary for each bundle.
-   *
-   * Phase 4 limitation: /api/bundles returns bundle-level metadata only (name,
-   * slug, url, dates, category). Individual game titles within each bundle are
-   * not available until Phase 5 adds game-level detail fetching. Until then,
-   * owned_count and total_count are null — the UI renders "—" for unknown counts.
-   *
-   * Phase 5 will populate game-level detail needed for real counts.
-   *
-   * @param {object[]} bundles     - Array of bundle objects from fetchBundles()
-   * @param {Set<string>} ownedNames - Normalized owned game names from buildOwnedSet()
-   * @returns {Array<object & { owned_count: null, total_count: null }>}
-   */
   computeOwnershipSummary(bundles, ownedNames) {
-    return bundles.map(bundle => ({ ...bundle, owned_count: null, total_count: null }));
+    return bundles.map(bundle => {
+      const countHighlight = (bundle.highlights ?? []).find(h => /\d+\s+games?/i.test(h));
+      const totalMatch = countHighlight ? countHighlight.match(/(\d+)/) : null;
+      const total_count = totalMatch ? parseInt(totalMatch[1], 10) : null;
+      return { ...bundle, owned_count: null, total_count };
+    });
+  },
+
+  async fetchBundleDetail(slug) {
+    const response = await fetch(`/api/bundles/${slug}/detail`);
+    if (!response.ok) throw new Error(`Bundle detail fetch failed: ${response.status}`);
+    return await response.json();
+  },
+
+  computeDetailOwnership(detail, ownedNames) {
+    const tiers = (detail.tiers || []).map(tier => ({
+      price_label: tier.price_label,
+      items: (tier.items || [])
+        .filter(item => item.human_name)
+        .map(item => ({
+          human_name: item.human_name,
+          msrp: item.msrp,
+          owned: ownedNames.has(this.normalizeName(item.human_name)),
+        })),
+    }));
+
+    const allGames = tiers.flatMap(t => t.items);
+    const totalCount = allGames.length;
+    const ownedCount = allGames.filter(g => g.owned).length;
+    const unownedGames = allGames.filter(g => !g.owned);
+    const valueScore = unownedGames.reduce((sum, g) => sum + (g.msrp || 0), 0);
+
+    return {
+      slug: detail.slug,
+      tiers,
+      total_count: totalCount,
+      owned_count: ownedCount,
+      unowned_count: totalCount - ownedCount,
+      value_score: Math.round(valueScore * 100) / 100,
+    };
   },
 };
 

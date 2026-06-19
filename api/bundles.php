@@ -134,6 +134,7 @@ foreach ($bundleSection['products'] ?? [] as $product) {
         'end_date'   => $endDate,
         'start_date' => $startDate,
         'category'   => $product['category']     ?? '',
+        'highlights' => $product['highlights']   ?? [],
     ];
 }
 
