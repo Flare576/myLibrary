@@ -56,7 +56,7 @@ if (!empty($rows)) {
     exit;
 }
 
-$humbleUrl = 'https://www.humblebundle.com/';
+$humbleUrl = 'https://www.humblebundle.com/games';
 $ch = curl_init($humbleUrl);
 curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
@@ -83,37 +83,23 @@ if ($httpCode !== 200) {
     jsonError(502, "Humble Bundle error: HTTP {$httpCode}");
 }
 
-// Parse <script id="webpack-json-data" type="application/json"> tag
-if (!preg_match('/<script[^>]+id=["\']webpack-json-data["\'][^>]*>(.*?)<\/script>/s', (string) $html, $matches)) {
-    error_log('MyLibrary bundles.php: webpack-json-data script tag not found in Humble response');
-    jsonError(502, 'Humble Bundle page structure changed: webpack-json-data not found');
+// Parse <script id="landingPage-json-data"> from the /games listing page
+if (!preg_match('/<script[^>]+id=["\']landingPage-json-data["\'][^>]*>(.*?)<\/script>/s', (string) $html, $matches)) {
+    error_log('MyLibrary bundles.php: landingPage-json-data script tag not found in Humble response');
+    jsonError(502, 'Humble Bundle page structure changed: landingPage-json-data not found');
 }
 
 $pageData = json_decode($matches[1], true);
 if (!is_array($pageData)) {
-    error_log('MyLibrary bundles.php: failed to JSON-decode webpack-json-data content');
+    error_log('MyLibrary bundles.php: failed to JSON-decode landingPage-json-data content');
     jsonError(502, 'Failed to parse Humble Bundle page data');
 }
 
-$mosaic        = $pageData['mosaic'] ?? [];
-$bundleSection = null;
-foreach ($mosaic as $section) {
-    if (($section['section_title']['data'] ?? '') === 'Bundles') {
-        $bundleSection = $section;
-        break;
-    }
-}
-
-if ($bundleSection === null) {
-    error_log('MyLibrary bundles.php: Bundles section not found in mosaic');
-    header('X-Cache: MISS');
-    http_response_code(200);
-    echo json_encode([], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-    exit;
-}
-
+// Path: data.data.games.mosaic[0].products
+$mosaic   = $pageData['data']['games']['mosaic'] ?? [];
+$products = $mosaic[0]['products'] ?? [];
 $bundles = [];
-foreach ($bundleSection['products'] ?? [] as $product) {
+foreach ($products as $product) {
     if (!str_starts_with($product['product_url'] ?? '', '/games/')) {
         continue;
     }

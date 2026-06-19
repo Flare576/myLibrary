@@ -179,9 +179,9 @@ test.describe('T-BUNDLES-UI: Bundle Browser tab UI', () => {
 
     for (let i = 0; i < count; i++) {
       const card = cards.nth(i);
-      const href = await card.getAttribute('href');
+      const href = await card.locator('.bundle-card-link').getAttribute('href');
       expect(href).toMatch(/^https:\/\/www\.humblebundle\.com\//);
-      expect(await card.getAttribute('target')).toBe('_blank');
+      expect(await card.locator('.bundle-card-link').getAttribute('target')).toBe('_blank');
     }
   });
 

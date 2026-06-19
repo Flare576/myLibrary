@@ -24,58 +24,92 @@
             </form>
         </div>
 
-        <div id="authenticated-view" class="card">
-            <h2 id="welcome-msg">Welcome</h2>
-            <nav id="view-tabs">
-                <button id="tab-library" class="tab-btn tab-active">Library</button>
-                <button id="tab-bundles" class="tab-btn">Bundles</button>
-            </nav>
-            <div id="library-view">
-                <button id="steam-connect-btn">Connect Steam</button>
-                <div id="steam-error" style="color: red"></div>
-                <section id="steam-library" style="display:none">
-                    <p id="steam-game-count">Steam: 0 games</p>
-                    <div id="steam-games-grid"></div>
-                    <button id="steam-disconnect-btn">Disconnect Steam</button>
-                </section>
-                <section id="epic-connect-section">
-                    <p>Connect your Epic Games library</p>
-                    <a id="epic-open-btn" href="#" target="_blank" rel="noopener noreferrer">Open Epic page</a>
-                    <div class="form-group">
-                        <label for="epic-code-input">Paste authorization code:</label>
-                        <input type="text" id="epic-code-input" placeholder="authorizationCode value from Epic page">
+        <div id="authenticated-view">
+            <header id="app-header">
+                <div class="header-left">
+                    <h1 class="app-title">MyLibrary</h1>
+                    <span id="welcome-msg" class="visually-hidden">Welcome</span>
+                </div>
+                <nav id="view-tabs">
+                    <button id="tab-library" class="tab-btn tab-active">Library</button>
+                    <button id="tab-bundles" class="tab-btn">Bundles</button>
+                </nav>
+                <div class="header-right">
+                    <button id="logout-btn" class="logout-link">Sign Out</button>
+                </div>
+            </header>
+            
+            <div id="content-area">
+                <div id="library-view">
+                    <div id="library-toolbar">
+                        <input type="search" id="library-search" placeholder="Search games…">
+                        <div id="platform-filters">
+                            <button class="filter-chip active" data-platform="all">All</button>
+                            <button class="filter-chip" data-platform="steam">Steam</button>
+                            <button class="filter-chip" data-platform="epic">Epic</button>
+                            <button class="filter-chip" data-platform="itch">itch.io</button>
+                        </div>
+                        <select id="library-sort">
+                            <option value="az">A-Z</option>
+                            <option value="platform">Platform</option>
+                        </select>
                     </div>
-                    <button id="epic-connect-btn">Connect Epic</button>
-                    <div id="epic-error" style="color: red"></div>
-                </section>
-                <section id="epic-library" style="display:none">
-                    <p id="epic-game-count">Epic: 0 games</p>
-                    <div id="epic-games-grid"></div>
-                    <button id="epic-disconnect-btn">Disconnect Epic</button>
-                </section>
-                <section id="itch-connect-section">
-                    <p>Connect your itch.io library</p>
-                    <a id="itch-open-btn" href="/api/itch/init">Connect itch.io</a>
-                    <div id="itch-error" style="color: red"></div>
-                </section>
-                <section id="itch-library" style="display:none">
-                    <p id="itch-game-count">itch.io: 0 games</p>
-                    <div id="itch-games-grid"></div>
-                    <button id="itch-disconnect-btn">Disconnect itch.io</button>
-                </section>
-            </div>
-            <div id="bundles-view" style="display:none">
-                <div id="bundles-loading" style="display:none">Loading bundles…</div>
-                <div id="bundles-error" style="display:none; color:red"></div>
-                <div id="bundles-list"></div>
-                <div id="bundle-detail" style="display:none">
-                    <button id="bundle-detail-back">← Back to bundles</button>
-                    <div id="bundle-detail-loading" style="display:none">Loading…</div>
-                    <div id="bundle-detail-error" style="display:none; color:red"></div>
-                    <div id="bundle-detail-content"></div>
+
+                    <details id="manage-platforms" open>
+                        <summary>Manage Platforms</summary>
+                        <div class="manage-platforms-content">
+                            <button id="steam-connect-btn">Connect Steam</button>
+                            <div id="steam-error" style="color: red"></div>
+                            <section id="steam-library" style="display:none">
+                                <p id="steam-game-count">Steam: 0 games</p>
+                                <div id="steam-games-grid" style="display:none"></div>
+                                <button id="steam-disconnect-btn">Disconnect Steam</button>
+                            </section>
+                            
+                            <section id="epic-connect-section">
+                                <p>Connect your Epic Games library</p>
+                                <a id="epic-open-btn" href="#" target="_blank" rel="noopener noreferrer">Open Epic page</a>
+                                <div class="form-group">
+                                    <label for="epic-code-input">Paste authorization code:</label>
+                                    <input type="text" id="epic-code-input" placeholder="authorizationCode value from Epic page">
+                                </div>
+                                <button id="epic-connect-btn">Connect Epic</button>
+                                <div id="epic-error" style="color: red"></div>
+                            </section>
+                            <section id="epic-library" style="display:none">
+                                <p id="epic-game-count">Epic: 0 games</p>
+                                <div id="epic-games-grid" style="display:none"></div>
+                                <button id="epic-disconnect-btn">Disconnect Epic</button>
+                            </section>
+                            
+                            <section id="itch-connect-section">
+                                <p>Connect your itch.io library</p>
+                                <a id="itch-open-btn" href="/api/itch/init">Connect itch.io</a>
+                                <div id="itch-error" style="color: red"></div>
+                            </section>
+                            <section id="itch-library" style="display:none">
+                                <p id="itch-game-count">itch.io: 0 games</p>
+                                <div id="itch-games-grid" style="display:none"></div>
+                                <button id="itch-disconnect-btn">Disconnect itch.io</button>
+                            </section>
+                        </div>
+                    </details>
+
+                    <div id="library-grid"></div>
+                </div>
+
+                <div id="bundles-view" style="display:none">
+                    <div id="bundles-loading" style="display:none">Loading bundles…</div>
+                    <div id="bundles-error" style="display:none; color:red"></div>
+                    <div id="bundles-list"></div>
+                    <div id="bundle-detail" style="display:none">
+                        <button id="bundle-detail-back">← Back to bundles</button>
+                        <div id="bundle-detail-loading" style="display:none">Loading…</div>
+                        <div id="bundle-detail-error" style="display:none; color:red"></div>
+                        <div id="bundle-detail-content"></div>
+                    </div>
                 </div>
             </div>
-            <button id="logout-btn">Sign Out</button>
         </div>
     </main>
 
@@ -118,6 +152,59 @@
         const tabLibrary = document.getElementById('tab-library');
         const tabBundles = document.getElementById('tab-bundles');
 
+        let allGames = [];
+
+        function rebuildLibraryGrid() {
+            const query = document.getElementById('library-search').value.toLowerCase();
+            const activePlatform = document.querySelector('.filter-chip.active').dataset.platform;
+            const sort = document.getElementById('library-sort').value;
+            
+            let filtered = allGames.filter(g => {
+                if (activePlatform !== 'all' && g.platform !== activePlatform) return false;
+                if (query && !g.name.toLowerCase().includes(query)) return false;
+                return true;
+            });
+            
+            if (sort === 'az') filtered.sort((a, b) => a.name.localeCompare(b.name));
+            else if (sort === 'platform') filtered.sort((a, b) => a.platform.localeCompare(b.platform));
+            
+            const grid = document.getElementById('library-grid');
+            grid.textContent = '';
+            filtered.forEach(g => {
+                const card = document.createElement('div');
+                card.className = 'game-card';
+                card.dataset.platform = g.platform;
+
+                const badge = document.createElement('span');
+                badge.className = `platform-badge platform-${g.platform}`;
+                badge.textContent = g.platform === 'itch' ? 'itch.io' : g.platform.charAt(0).toUpperCase() + g.platform.slice(1);
+
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'game-name';
+                nameSpan.textContent = g.name;
+
+                card.appendChild(badge);
+                card.appendChild(nameSpan);
+                grid.appendChild(card);
+            });
+        }
+
+        let searchTimer;
+        document.getElementById('library-search').addEventListener('input', () => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(rebuildLibraryGrid, 150);
+        });
+
+        document.querySelectorAll('.filter-chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+                chip.classList.add('active');
+                rebuildLibraryGrid();
+            });
+        });
+
+        document.getElementById('library-sort').addEventListener('change', rebuildLibraryGrid);
+
         const pageParams = new URLSearchParams(window.location.search);
         const pendingSteamCallback = pageParams.get('steam_connected') === '1';
         const pendingSteamError = pageParams.get('steam_error') ?? null;
@@ -149,7 +236,7 @@
 
             bundlesLoading.style.display = '';
             bundlesError.style.display = 'none';
-            bundlesList.innerHTML = '';
+            bundlesList.textContent = '';
 
             try {
                 const state = authManager.getState();
@@ -165,22 +252,26 @@
                 }
 
                 bundles.forEach(bundle => {
-                    const cardWrapper = document.createElement('div');
-                    cardWrapper.className = 'bundle-card-wrapper';
-
-                    const card = document.createElement('a');
+                    const card = document.createElement('div');
                     card.className = 'bundle-card';
-                    card.href = bundle.url;
-                    card.target = '_blank';
-                    card.rel = 'noopener noreferrer';
+
+                    const cardLink = document.createElement('a');
+                    cardLink.className = 'bundle-card-link';
+                    cardLink.href = bundle.url;
+                    cardLink.target = '_blank';
+                    cardLink.rel = 'noopener noreferrer';
 
                     const name = document.createElement('h3');
                     name.className = 'bundle-name';
                     name.textContent = bundle.name;
 
+                    cardLink.appendChild(name);
+
                     const endDate = document.createElement('p');
                     endDate.className = 'bundle-end-date';
                     const d = new Date(bundle.end_date);
+                    const daysLeft = Math.ceil((d - Date.now()) / (1000 * 60 * 60 * 24));
+                    if (daysLeft < 3) endDate.classList.add('bundle-expiring-soon');
                     endDate.textContent = `Ends ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
 
                     const ownership = document.createElement('p');
@@ -191,7 +282,7 @@
                         ? `${total} games — ${owned} you don't own`
                         : `${total} games`;
 
-                    card.appendChild(name);
+                    card.appendChild(cardLink);
                     card.appendChild(endDate);
                     card.appendChild(ownership);
 
@@ -200,9 +291,8 @@
                     detailBtn.dataset.slug = bundle.slug;
                     detailBtn.textContent = 'Details';
 
-                    cardWrapper.appendChild(card);
-                    cardWrapper.appendChild(detailBtn);
-                    bundlesList.appendChild(cardWrapper);
+                    card.appendChild(detailBtn);
+                    bundlesList.appendChild(card);
                 });
             } catch (err) {
                 bundlesLoading.style.display = 'none';
@@ -222,7 +312,7 @@
             detailPanel.style.display = '';
             detailLoading.style.display = '';
             detailError.style.display = 'none';
-            detailContent.innerHTML = '';
+            detailContent.textContent = '';
 
             try {
                 const state = authManager.getState();
@@ -237,7 +327,10 @@
                 const unownedCount = detail.unowned_count;
                 const totalCount = detail.total_count;
                 const valueScore = detail.value_score;
-                header.innerHTML = `<p class="bundle-detail-summary">${unownedCount} of ${totalCount} games you don't own — $${valueScore.toFixed(2)} value</p>`;
+                const summary = document.createElement('p');
+                summary.className = 'bundle-detail-summary';
+                summary.textContent = `${unownedCount} of ${totalCount} games you don't own — $${valueScore.toFixed(2)} value`;
+                header.appendChild(summary);
                 detailContent.appendChild(header);
 
                 detail.tiers.forEach(tier => {
@@ -286,51 +379,37 @@
             const btn = e.target.closest('.bundle-detail-btn');
             if (btn) {
                 e.preventDefault();
+                e.stopPropagation();
                 loadBundleDetail(btn.dataset.slug);
             }
         });
 
         function renderSteamGames(games) {
-            steamGamesGrid.innerHTML = '';
+            allGames = allGames.filter(g => g.platform !== 'steam');
             (games || []).forEach(game => {
-                const card = document.createElement('div');
-                card.className = 'game-card';
-                const nameSpan = document.createElement('span');
-                nameSpan.className = 'game-name';
-                nameSpan.textContent = game.name;
-                card.appendChild(nameSpan);
-                steamGamesGrid.appendChild(card);
+                if (game.name) allGames.push({ name: game.name, platform: 'steam' });
             });
+            rebuildLibraryGrid();
             const n = (games || []).length;
             steamGameCount.textContent = `Steam: ${n} ${n === 1 ? 'game' : 'games'}`;
         }
 
         function renderEpicGames(games) {
-            epicGamesGrid.innerHTML = '';
+            allGames = allGames.filter(g => g.platform !== 'epic');
             (games || []).forEach(game => {
-                const card = document.createElement('div');
-                card.className = 'game-card';
-                const nameSpan = document.createElement('span');
-                nameSpan.className = 'game-name';
-                nameSpan.textContent = game.name;
-                card.appendChild(nameSpan);
-                epicGamesGrid.appendChild(card);
+                if (game.name) allGames.push({ name: game.name, platform: 'epic' });
             });
+            rebuildLibraryGrid();
             const n = (games || []).length;
             epicGameCount.textContent = `Epic: ${n} games`;
         }
 
         function renderItchGames(games) {
-            itchGamesGrid.innerHTML = '';
+            allGames = allGames.filter(g => g.platform !== 'itch');
             (games || []).forEach(game => {
-                const card = document.createElement('div');
-                card.className = 'game-card';
-                const nameSpan = document.createElement('span');
-                nameSpan.className = 'game-name';
-                nameSpan.textContent = game.name;
-                card.appendChild(nameSpan);
-                itchGamesGrid.appendChild(card);
+                if (game.name) allGames.push({ name: game.name, platform: 'itch' });
             });
+            rebuildLibraryGrid();
             const n = (games || []).length;
             itchGameCount.textContent = `itch.io: ${n} games`;
         }
@@ -373,6 +452,8 @@
             appContainer.dataset.authState = 'unauthenticated';
             loginForm.reset();
             loginError.textContent = '';
+            allGames = [];
+            rebuildLibraryGrid();
             steamConnectBtn.style.display = '';
             steamLibrary.style.display = 'none';
             epicLibrary.style.display = 'none';
@@ -397,6 +478,8 @@
         });
 
         document.addEventListener('steam:disconnected', () => {
+            allGames = allGames.filter(g => g.platform !== 'steam');
+            rebuildLibraryGrid();
             steamConnectBtn.style.display = '';
             steamLibrary.style.display = 'none';
         });
@@ -415,6 +498,8 @@
         });
 
         document.addEventListener('epic:disconnected', () => {
+            allGames = allGames.filter(g => g.platform !== 'epic');
+            rebuildLibraryGrid();
             epicLibrary.style.display = 'none';
             epicConnectSection.style.display = '';
         });
@@ -432,6 +517,8 @@
         });
 
         document.addEventListener('itch:disconnected', () => {
+            allGames = allGames.filter(g => g.platform !== 'itch');
+            rebuildLibraryGrid();
             itchLibrary.style.display = 'none';
             itchConnectSection.style.display = '';
         });
