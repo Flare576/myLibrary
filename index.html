@@ -76,6 +76,15 @@
                                 <section id="epic-connect-section">
                                     <p class="platform-instructions">Log into epicgames.com, then open the link below. Copy the <code>authorizationCode</code> value from the JSON and paste it here.</p>
                                     <a id="epic-open-btn" href="#" target="_blank" rel="noopener noreferrer" class="platform-link">Open Epic authorization page ↗</a>
+                                    <details class="epic-wtf">
+                                        <summary>Why is this flow so weird?</summary>
+                                        <div class="epic-wtf-body">
+                                            <p>Epic, unlike Steam or itch.io or 99% of companies, doesn't offer a public API for sites like this to get basic information on your behalf. The only way for MyLibrary to know what games you own on Epic is to impersonate the launcher.</p>
+                                            <p>Yes, it's as stupid as it sounds. <strong>BUT</strong> — the auth code you paste here is saved <em>in your browser</em>. When your session syncs, it's encrypted on your machine before anything leaves it. I never see your encryption key — it's derived from your username and password, which also never reach my server.</p>
+                                            <p>The one wrinkle: Epic doesn't support cross-site API calls either, so your browser fetches your library <strong>through</strong> flare576.com. I don't log the request or store the payload, but your Epic token does travel through that call.</p>
+                                            <p class="epic-wtf-footer">It's the best I could do with what Epic gave me.</p>
+                                        </div>
+                                    </details>
                                     <input type="text" id="epic-code-input" class="platform-input" placeholder="Paste authorizationCode here…">
                                     <button id="epic-connect-btn" class="platform-btn">Connect Epic</button>
                                     <div id="epic-error" class="platform-error"></div>

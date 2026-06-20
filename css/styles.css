@@ -267,6 +267,61 @@ main {
   text-decoration: underline;
 }
 
+.epic-wtf {
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg);
+}
+
+.epic-wtf summary {
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+  min-height: 44px;
+}
+
+.epic-wtf summary::-webkit-details-marker { display: none; }
+
+.epic-wtf summary::before {
+  content: '▶';
+  font-size: 0.6rem;
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.epic-wtf[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.epic-wtf-body {
+  padding: 0 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.epic-wtf-body p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  line-height: 1.55;
+}
+
+.epic-wtf-body strong {
+  color: var(--color-text);
+}
+
+.epic-wtf-footer {
+  font-style: italic;
+  opacity: 0.75;
+}
+
 .platform-input {
   width: 100%;
   box-sizing: border-box;
