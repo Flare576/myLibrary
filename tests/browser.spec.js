@@ -246,6 +246,8 @@ test.describe('T-HTML: index.html auth state machine', () => {
     await page.click('#login-btn');
 
     await expect(page.locator('#authenticated-view')).toBeVisible();
+    // Oracle: manage-platforms closes when platforms connected — open it to check state
+    await page.locator('#manage-platforms').evaluate(el => el.setAttribute('open', ''));
     // Oracle: library section visible immediately — no connect flow needed
     await expect(page.locator('#steam-library')).toBeVisible();
     await expect(page.locator('#steam-connect-btn')).toBeHidden();

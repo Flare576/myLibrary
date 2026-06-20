@@ -138,6 +138,8 @@ test.describe('T-ITCH-BROWSER: itch.io browser behavior', () => {
     await page.click('#login-btn');
 
     await expect(page.locator('#authenticated-view')).toBeVisible();
+    // Oracle: manage-platforms closes when platforms connected — open it to check state
+    await page.locator('#manage-platforms').evaluate(el => el.setAttribute('open', ''));
     // Oracle: itch state loaded from blob → library visible without re-connecting
     await expect(page.locator('#itch-library')).toBeVisible();
     await expect(page.locator('#itch-connect-section')).toBeHidden();

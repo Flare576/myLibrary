@@ -92,7 +92,14 @@ test.describe('T-DETAIL: Bundle detail API integration', () => {
       const res = await api.get('/api/bundles');
       if (res.ok()) {
         const bundles = await res.json();
-        realSlug = bundles.length > 0 ? bundles[0].slug : null;
+        // Find first slug whose detail endpoint actually returns 200
+        for (const bundle of bundles) {
+          const detail = await api.get(`/api/bundles/${bundle.slug}/detail`);
+          if (detail.ok()) {
+            realSlug = bundle.slug;
+            break;
+          }
+        }
       }
     } catch (_e) {
       realSlug = null;

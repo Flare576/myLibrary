@@ -50,11 +50,12 @@ test.describe('T-STEAM: Steam API integration', () => {
     expect(res.status()).toBe(302);
     const location = res.headers()['location'];
     expect(location).toContain('steam_error=');
+    // Oracle: nonce param absent → Missing nonce (session check removed; URL nonce required)
     const url = new URL(location, BASE);
-    expect(url.searchParams.get('steam_error')).toBe('Invalid nonce');
+    expect(url.searchParams.get('steam_error')).toBe('Missing nonce');
   });
 
-  test('T-STEAM-05: callback with spoofed nonce and no matching session → 302 redirect with steam_error', async () => {
+  test('T-STEAM-05: callback with spoofed nonce but invalid return_to → 302 redirect with steam_error', async () => {
     const res = await api.get(
       '/api/steam/callback?openid.mode=id_res' +
       '&openid.claimed_id=https%3A%2F%2Fsteamcommunity.com%2Fopenid%2Fid%2F76561198000000000' +
@@ -64,8 +65,9 @@ test.describe('T-STEAM: Steam API integration', () => {
     expect(res.status()).toBe(302);
     const location = res.headers()['location'];
     expect(location).toContain('steam_error=');
+    // Oracle: nonce present but openid.return_to absent/wrong → Invalid return_to
     const url = new URL(location, BASE);
-    expect(url.searchParams.get('steam_error')).toBe('Invalid nonce');
+    expect(url.searchParams.get('steam_error')).toBe('Invalid return_to');
   });
 
   test('T-STEAM-06: GET /api/steam/games with no steamid → 400, error mentions steamid', async () => {
