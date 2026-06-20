@@ -12,8 +12,8 @@ Target device: Steam Deck (1280×800, landscape, controller-friendly).
 ### Architecture
 - **Backend**: PHP 8.5 + MariaDB (dev: local socket at `/tmp/mysql.sock`; prod: IONOS shared hosting)
 - **Frontend**: Vanilla JavaScript ES modules, no frameworks, no build step
-- **Auth model**: Passwordless, client-side crypto only — server stores an opaque encrypted blob it can never decrypt
-- **Deployment**: SFTP via `lftp` to IONOS
+- **Auth model**: Username + passphrase → PBKDF2-derived AES key → client-side encrypted blob. Server stores opaque ciphertext it can never decrypt.
+- **Deployment**: SFTP via `lftp` to IONOS. Use `./deploy` — it handles prod config and Apache entry point automatically.
 
 ### Key Principle
 Server is a dumb proxy + blob store. All sensitive data (game libraries, OAuth tokens) lives client-side, encrypted with a key the server never sees (WebCrypto AES-GCM, PBKDF2-derived key).
@@ -23,72 +23,111 @@ Steam's OpenID flow navigates away from the page, losing in-memory credentials. 
 
 This stores credentials in plaintext in the browser. For this project (personal tool, no third-party scripts, no CDN) the risk is acceptable. Do not change this to `localStorage`. Do not "fix" it without understanding why it exists.
 
+### APP_BASE (critical for prod)
+The app is deployed at `https://flare576.com/myLibrary/` — a subdirectory, not a root domain. All JS fetch paths and `window.history.replaceState` calls MUST use `(window.APP_BASE || '') + '/api/...'`. `APP_BASE` is set at page load from `window.location.pathname`. Hardcoded `/api/` paths work locally but break on prod.
+
 ---
 
-## Current Files (v2 — Phase 0 complete)
+## Current Files (v2 — Phases 0-7 complete)
 
 ```
-index.html          — single-page app shell (auth state machine)
-router.php          — PHP dev server router
-config.php          — DB credentials, API keys (NEVER COMMIT — gitignored)
-deploy              — SFTP deployment script
+index.html          — single-page app shell (auth + library + bundle browser)
+router.php          — PHP dev server router (deployed as index.php on prod via deploy script)
+config.php          — Local dev config (NEVER COMMIT — gitignored)
+config.prod.php     — Production config (NEVER COMMIT — gitignored, deployed as config.php)
+deploy              — SFTP deploy script
+.htaccess           — Apache routing (DirectorySlash Off, routes all non-files through index.php)
+.vroomrc            — Vroom dev tool PATH config
 
 api/
   sync.php          — GET/HEAD/POST blob store (ETag concurrency control)
+  bundles.php       — Humble Bundle scraper + cache (webpack-json-data from /games page)
+  bundles/
+    detail.php      — Per-bundle tier/game detail via Parse.bot API
+  steam/
+    init.php        — OpenID redirect to Steam
+    callback.php    — Assertion verification + SteamID extraction (no session nonce — unreliable on IONOS)
+    games.php       — IPlayerService proxy (server holds API key)
+  epic/
+    exchange.php    — Code → token exchange + library fetch (one round-trip, tokens returned to client)
+  itch/
+    init.php        — OAuth redirect (implicit flow)
+    callback.php    — Serves index.html with APP_BASE + base href injected for correct asset resolution
+    library.php     — Owned-keys proxy (handles pagination + empty {} edge case)
 
 classes/
-  Cache.php         — file cache with locking, TTL, gzip (kept from v1)
+  Cache.php         — File cache with locking, TTL, gzip
 
 js/
-  crypto.js         — WebCrypto module: deriveKey, generateUserId, encrypt, decrypt
-  auth.js           — AuthManager class: login, logout, getState, saveState
+  crypto.js         — WebCrypto: deriveKey, generateUserId, encrypt, decrypt (Ei pattern)
+  auth.js           — AuthManager: login, logout, getState, saveState (ETag concurrency)
+  steam.js          — SteamManager: connectSteam, handleCallback, disconnectSteam
+  epic.js           — EpicManager: connectEpic, disconnectEpic
+  itch.js           — ItchManager: handleCallback, fetchLibrary, disconnectItch
+  bundles.js        — bundleManager: fetch, normalizeName, buildOwnedSet, computeDetailOwnership
 
 css/
-  styles.css        — CSS custom properties + auth state visibility rules
+  styles.css        — CSS custom properties + full layout (dark-first, SteamDeck-optimized)
 
 db/
-  schema.sql        — minimal 4-table schema (idempotent, drops + recreates)
+  schema.sql        — 4-table schema: users, user_blobs, bundle_cache, rate_limits
 
 tests/
-  README.md         — test inventory + counts (update this when adding tests)
-  crypto.test.js    — Bun unit tests for js/crypto.js (10 tests)
-  auth.test.js      — Bun unit tests for js/auth.js (10 tests)
-  sync.spec.js      — Playwright integration tests for api/sync.php (9 tests)
-  browser.spec.js   — Playwright browser tests for index.html (4 tests)
+  README.md         — test inventory + counts (UPDATE THIS when adding tests)
+  crypto.test.js    — Bun unit — crypto.js (10 tests)
+  auth.test.js      — Bun unit — auth.js (10 tests)
+  bundles.test.js   — Bun unit — bundleManager normalizeName + computeOwnershipSummary (38 tests)
+  bundles-detail.test.js — Bun unit — computeDetailOwnership (16 tests)
+  sync.spec.js      — Playwright — sync.php HTTP (9 tests)
+  browser.spec.js   — Playwright — auth state machine (10 tests)
+  steam.spec.js     — Playwright — Steam API + callback (8 tests)
+  epic.spec.js      — Playwright — Epic exchange + browser (8 tests)
+  itch.spec.js      — Playwright — itch API (4 tests)
+  itch-behavior.spec.js — Playwright browser — itch connect/disconnect/callback (9 tests)
+  bundles.spec.js   — Playwright browser — bundle listing UI (8 tests)
+  bundles-detail.spec.js — Playwright — bundle detail API + UI (16 tests)
+  schema.spec.js    — Playwright — DB schema regression (3 tests)
+  session.spec.js   — Playwright browser — SessionStore auto-login (3 tests)
+  design.spec.js    — Playwright — Phase 6/7 design requirements (20 tests)
 
-playwright.config.js — Playwright config (Chromium, --no-sandbox, port 8181)
+playwright.config.js — Playwright config (Chromium, --no-sandbox, port 8181, BASE_URL env support)
 package.json         — test scripts
 ```
 
 ### Files That Must Never Be Committed
-- `config.php` — DB credentials, API keys, SMTP password
-- `tickets/*` — may contain API keys or sensitive info
-- `logs/` — may contain production system logs
+- `config.php`, `config.prod.php` — DB credentials, API keys (covered by `config*.php` gitignore rule)
+- `logs/` — production PHP errors
+- `tickets/` — may contain API keys or sensitive info
+- `.sisyphus/` — local agent planning files
 
 ---
 
 ## Dev Environment
 
-Running inside Distrobox (Arch) on a Steam Deck. PHP and MariaDB run directly in this container (yes, intentionally — we threw the clean-container philosophy out the window in Phase 0).
+Running inside Distrobox (Arch) on a Steam Deck. PHP and MariaDB run directly — no containers.
 
 ### Starting the dev server
 ```bash
 # PHP dev server (port 8181)
 php -S 0.0.0.0:8181 router.php
 
-# Or check if it's already running
-cat php.pid
-curl -s http://127.0.0.1:8181/ | head -3
+# Check if already running
+ps aux | grep "php -S" | grep -v grep
 ```
 
 ### Database
 ```bash
-# MariaDB socket is at /tmp/mysql.sock (started via mariadbd-safe in a tmux session)
+# MariaDB socket at /tmp/mysql.sock (start via tmux if not running)
+tmux new-session -d -s mariadb "mariadbd --user=deck --datadir=/var/lib/mysql --socket=/tmp/mysql.sock"
+
 # Load/reset schema (idempotent — drops and recreates all tables)
 mariadb --socket=/tmp/mysql.sock mylibrary_db < db/schema.sql
 mariadb --socket=/tmp/mysql.sock mylibrary_db -e "SHOW TABLES;"
 # Expected: bundle_cache, rate_limits, user_blobs, users
 ```
+
+### Dev config
+`config.php` points at local MariaDB socket. `config.prod.php` has IONOS credentials. Both gitignored.
 
 ---
 
@@ -97,50 +136,58 @@ mariadb --socket=/tmp/mysql.sock mylibrary_db -e "SHOW TABLES;"
 **Prerequisite**: PHP dev server must be running on port 8181 for integration and browser tests.
 
 ```bash
-npm test                  # full suite: unit + integration + browser (33 tests)
-npm run test:unit         # Bun only — crypto.js + auth.js (no server needed)
-npm run test:integration  # Playwright — sync.php live HTTP tests
-npm run test:browser      # Playwright — index.html in real Chromium
+npm test              # full local suite: 74 unit + 115 Playwright = 189 tests
+npm run test:unit     # Bun only — no server needed (74 tests)
+npm run test:prod     # 56 integration tests against https://flare576.com/myLibrary
 ```
 
+### Test counts (update tests/README.md when adding tests)
+- **Unit** (Bun): 74 tests across 4 files
+- **Playwright** (local): 115 tests across 11 spec files
+- **Playwright** (prod): 56 tests — API/integration only, no mocked-sync tests
+
 ### Test stack
-- **Unit tests** (`*.test.js`): run via `bun test`. WebCrypto and `fetch` are available natively in Bun — no browser needed for the crypto/auth logic.
-- **Integration + browser tests** (`*.spec.js`): run via `npx playwright test`. Uses the bundled Chromium headless shell at `~/.cache/ms-playwright/`. Requires `--no-sandbox` (already in `playwright.config.js`).
+- **Unit tests** (`*.test.js`): Bun runtime. WebCrypto available natively — no browser needed.
+- **Playwright tests** (`*.spec.js`): Headless Chromium at `~/.cache/ms-playwright/`. `--no-sandbox` required (container environment).
+- **Prod tests**: `BASE_URL=https://flare576.com/myLibrary npx playwright test ...` — hits real prod DB and APIs.
 
 ### When adding tests for a new phase
-
-**Unit tests** (`tests/*.test.js`):
-- Add the file to the `bun test` command in `package.json` `test:unit` script
-- Also add it to the main `test` script
-
-**Playwright tests** (`tests/*.spec.js`):
-- They're picked up automatically by `playwright.config.js` (`testMatch: ['**/*.spec.js']`)
-- No config change needed — just create the file
+**Unit** (`*.test.js`): add to `test:unit` and `test` scripts in `package.json`.
+**Playwright** (`*.spec.js`): auto-discovered by `playwright.config.js` — just create the file.
 
 ### Test IDs
-Tests are tagged with IDs matching the strategy doc (e.g., `T-CRYPTO-02`, `T-AUTH-01`, `T-SYNC-05`). The strategy lives in `.sisyphus/plans/rebuild.md` — cross-reference there for oracle rationale.
+Oracle-style comments: `// Oracle: reason this assertion is correct`. Cross-reference `.sisyphus/plans/rebuild.md`.
 
 ---
 
-## API Endpoints (Phase 0)
+## API Endpoints
 
 | Method | Path | Purpose |
 |--------|------|---------|
 | GET | `/api/sync/{userId}` | Fetch encrypted blob — 200 + ETag or 404 |
-| HEAD | `/api/sync/{userId}` | Check blob existence + ETag, no body |
-| POST | `/api/sync/{userId}` | Store encrypted blob — supports If-Match for concurrency |
+| HEAD | `/api/sync/{userId}` | Check blob existence + ETag |
+| POST | `/api/sync/{userId}` | Store encrypted blob — If-Match for concurrency |
+| GET | `/api/steam/init` | Start Steam OpenID flow |
+| GET | `/api/steam/callback` | Verify Steam assertion, redirect with steamid |
+| GET | `/api/steam/games?steamid=X` | Proxy IPlayerService GetOwnedGames |
+| POST | `/api/epic/exchange` | Exchange Epic auth code → tokens + games (one round-trip) |
+| GET | `/api/itch/init` | Start itch.io OAuth implicit flow |
+| GET | `/api/itch/callback` | Serves index.html with APP_BASE injected (token in hash) |
+| POST | `/api/itch/library` | Proxy itch.io owned-keys API |
+| GET | `/api/bundles` | Humble Bundle listing (scraped + cached) |
+| GET | `/api/bundles/{slug}/detail` | Per-bundle tier/game detail (Parse.bot) |
 
-**userId format**: URL-safe base64, no padding (`^[a-zA-Z0-9_\-]+$`). Derived client-side via `generateUserId()` in `crypto.js` — server never computes or validates this.
+**userId format**: URL-safe base64, no padding (`^[a-zA-Z0-9_\-]+$`).
 
 ---
 
 ## Auth Model (v2)
 
 1. User enters username + passphrase
-2. Browser derives AES-GCM-256 key via PBKDF2 (310k iterations, fixed salt — key never leaves RAM)
-3. Browser computes `userId` = deterministic encryption of sentinel string with zeroed IV
-4. GET `/api/sync/{userId}` → 404 (new user, start with empty state) or 200 + encrypted blob
-5. On 200: decrypt blob → if success, correct credentials → app loads
+2. Browser derives AES-GCM-256 key via PBKDF2 (310k iterations, salt `"ei-the-answer-is-42"` — key never leaves RAM)
+3. Browser computes `userId` = encrypt `"the_answer_is_42"` with zeroed IV → URL-safe base64
+4. GET `/api/sync/{userId}` → 404 (new user) or 200 + encrypted blob
+5. On 200: decrypt blob → success = correct credentials → app loads
 6. On state change → re-encrypt → POST `/api/sync/{userId}` with If-Match ETag
 
 No sessions. No JWTs. No passwords stored anywhere. Server maps `userId → opaque blob`.
@@ -149,11 +196,32 @@ No sessions. No JWTs. No passwords stored anywhere. Server maps `userId → opaq
 ```json
 {
   "steam": { "steamId": "...", "games": [...] },
-  "epic":  { "accessToken": "...", "refreshToken": "...", "games": [...] },
+  "epic":  { "accessToken": "...", "refreshToken": "...", "accountId": "...", "expiresAt": "...", "games": [...] },
   "itch":  { "token": "...", "games": [...] },
   "lastSync": { "steam": "ISO8601", "epic": "ISO8601", "itch": "ISO8601" }
 }
 ```
+
+---
+
+## Platform Integration Status
+
+| Platform | Status | Notes |
+|----------|--------|-------|
+| Steam | ✅ Complete | OpenID 2.0; session nonce removed (unreliable on IONOS — assertion verification sufficient) |
+| Epic | ✅ Complete | User pastes auth code from epicgames.com/id/api/redirect; server exchanges + fetches library in one call |
+| itch.io | ✅ Complete | Implicit OAuth; token in URL hash; `{}` empty library edge case handled; `#error=` denial handled |
+| GOG | Not planned | No public API |
+| Humble Bundle | ✅ Complete | Scraped from `humblebundle.com/games` (`webpack-json-data` tag, NOT homepage); game detail via Parse.bot |
+
+### Epic auth flow (unusual)
+No redirect URI. User visits `https://www.epicgames.com/id/api/redirect?clientId=34a02cf8f4414e29b15921876da36f9a&responseType=code`, copies `authorizationCode` from JSON, pastes into app. Server exchanges via `account-public-service-prod03.ol.epicgames.com`. Uses `launcherAppClient2` credentials.
+
+### Humble Bundle scraping
+- **List**: `humblebundle.com/games` page → `<script id="webpack-json-data">` → `data.data.games.mosaic[0].products`
+- **Filter**: only `product_url` starting with `/games/` (excludes books/software)
+- **Detail**: Parse.bot API `get_bundle_detail?bundle_slug={slug}` (free tier: 100 credits/month)
+- **Cache**: TTL = bundle `end_date`; some slugs return 502 (Parse.bot can't scrape that bundle page structure)
 
 ---
 
@@ -162,53 +230,56 @@ No sessions. No JWTs. No passwords stored anywhere. Server maps `userId → opaq
 | Table | Purpose |
 |-------|---------|
 | `users` | Just an ID + timestamps. No PII. |
-| `user_blobs` | `user_id → blob (opaque ciphertext) + etag`. Server never decrypts. |
-| `bundle_cache` | Humble bundle data + TTL. Public, no user data. (Phase 4+) |
-| `rate_limits` | IP/userId hash → request count + window. (Phase 4+) |
+| `user_blobs` | `user_id → blob (MEDIUMTEXT, opaque ciphertext) + etag`. Server never decrypts. |
+| `bundle_cache` | Humble bundle data + TTL. Public, no user data. |
+| `rate_limits` | IP/userId hash → request count + window. |
 
----
-
-## Platform Integration Status
-
-| Platform | Status | Notes |
-|----------|--------|-------|
-| Steam | Phase 1 — not started | OpenID 2.0; server-side assertion verification needed |
-| Epic | Phase 2 — not started | Client-side token flow; server is exchange proxy only |
-| itch.io | Phase 3 — not started | OAuth implicit flow; empty library returns `{}` not `[]` |
-| GOG | Not planned | No public API |
-| Humble Bundle | Phase 4+ | Bundle listing via `landingPage-json-data`; game detail via Parse.bot or scraper |
+**Note**: `user_blobs.blob` is `MEDIUMTEXT` (not `TEXT`) — encrypted libraries easily exceed TEXT's 64KB limit.
 
 ---
 
 ## Deployment
 
 ```bash
-./deploy                     # Upload changes only (dev — no commit)
-./deploy -m "commit message" # Upload + commit (only when phase is confirmed working)
-./deploy -p                  # Post to BlueSky after deploy
+./deploy        # Commit current state and deploy to prod
+./deploy -n     # Dry run
 ```
 
-SFTP via `lftp`. Excludes: dotfiles, `config.php`, `*.swp`, `*.bkp`, `tags`.
+**What deploy does:**
+- Uploads `config.prod.php` → `config.php` on server
+- Uploads `router.php` → `index.php` on server (Apache entry point)
+- Mirrors all other files (excludes: config*, node_modules/, tests/, screenshots/, .sisyphus/, logs/, dev dotfiles)
 
-### PHP config on IONOS
-Each subdirectory needs its own `php.ini` — IONOS hosting is NOT hierarchical. If a new `api/` subdirectory stops logging errors, copy `php.ini` into it.
+**For full deploy guidance**, load the `mylibrary-deploy` skill.
+
+### Prod environment
+- URL: `https://flare576.com/myLibrary/` (trailing slash required — bare path 403s due to Apache directory handling)
+- Subdomain: `https://mylibrary.flare576.com` → redirects to above
+- PHP error logs: `lftp` mirror on `logs/` dir
+
+### IONOS gotchas
+- **Apache sessions unreliable** — don't use `$_SESSION` for anything load-bearing
+- **DB not externally accessible** — run migrations via temporary PHP script uploaded via SFTP
+- **`php.ini` not hierarchical** — each `api/` subdir may need its own copy for error logging
+- **SSL cert re-issue** — if subdomain loses cert after config changes, "Reissue SSL" in IONOS panel fixes immediately
 
 ---
 
 ## Git Strategy
 
-- `main` — v1 historical record (grok experiment)
-- `v2` — new base; all v2 work merges here
-- `phase-0-foundation`, `v2/phase-1-steam`, etc. — feature branches per phase
-- `feature/epic-library-fix` — historical Epic research branch
+- `main` — current release (v2); all production deployments from here
+- `v2` — v2 base branch; feature branches merge here, then v2 merges to main for release
+- `phase-N-name` — feature branches per phase (e.g. `phase-7-polish`)
+- `grok-first-pass`, `feature/epic-library-fix` — historical v1/research branches
 
-When a phase is verified (tests green), PR → `v2`. At Phase 6 completion, `v2` → `main` as the v2 release.
+Branch naming: `phase-N-name` (NOT `v2/phase-N-name` — Git won't allow branch names that are prefixes of existing branch names).
 
 ---
 
 ## FTP Log Management
 
 ```bash
+cd /home/deck/Projects/Personal/myLibrary
 lftp -u "$MYLIB_FTP_USER","$MYLIB_FTP_PASS" "sftp://$MYLIB_FTP_HOST:22" <<EOF
 mirror --verbose logs/
 bye
