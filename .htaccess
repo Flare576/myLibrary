@@ -3,10 +3,6 @@ RewriteBase /myLibrary/
 Options -Indexes
 DirectorySlash Off
 
-# Redirect bare /myLibrary to /myLibrary/ — Apache handles the directory
-# before our rules fire, so we need an explicit redirect here
-RewriteRule ^$ /myLibrary/ [R=301,L]
-
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteRule ^ index.php [L]
 DirectoryIndex index.php index.html
