@@ -15,7 +15,7 @@
  * No UI logic lives here — only data and network concerns.
  */
 
-const BUNDLES_API = (window.APP_BASE ?? '') + '/api/bundles';
+const BUNDLES_API = (typeof window !== 'undefined' && window.APP_BASE || '') + '/api/bundles';
 
 /**
  * Edition suffix alternation used by normalizeName — order matters, longer
