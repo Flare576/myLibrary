@@ -418,6 +418,9 @@
             appContainer.dataset.authState = 'authenticated';
             welcomeMsg.textContent = `Welcome, ${username}`;
 
+            if (state.steam || state.epic || state.itch) {
+                document.getElementById('manage-platforms').removeAttribute('open');
+            }
             if (pendingSteamError) {
                 const errDiv = document.getElementById('steam-error');
                 if (errDiv) errDiv.textContent = pendingSteamError;
