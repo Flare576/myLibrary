@@ -266,17 +266,10 @@
                     const card = document.createElement('div');
                     card.className = 'bundle-card';
 
-                    const cardLink = document.createElement('a');
-                    cardLink.className = 'bundle-card-link';
-                    cardLink.href = bundle.url;
-                    cardLink.target = '_blank';
-                    cardLink.rel = 'noopener noreferrer';
-
-                    const name = document.createElement('h3');
-                    name.className = 'bundle-name';
+                    const name = document.createElement('button');
+                    name.className = 'bundle-name bundle-detail-btn';
+                    name.dataset.slug = bundle.slug;
                     name.textContent = bundle.name;
-
-                    cardLink.appendChild(name);
 
                     const endDate = document.createElement('p');
                     endDate.className = 'bundle-end-date';
@@ -293,16 +286,28 @@
                         ? `${total} games — ${owned} you don't own`
                         : `${total} games`;
 
-                    card.appendChild(cardLink);
+                    card.appendChild(name);
                     card.appendChild(endDate);
                     card.appendChild(ownership);
+
+                    const btnRow = document.createElement('div');
+                    btnRow.className = 'bundle-btn-row';
 
                     const detailBtn = document.createElement('button');
                     detailBtn.className = 'bundle-detail-btn';
                     detailBtn.dataset.slug = bundle.slug;
                     detailBtn.textContent = 'Details';
 
-                    card.appendChild(detailBtn);
+                    const humbleBtn = document.createElement('a');
+                    humbleBtn.className = 'bundle-humble-btn';
+                    humbleBtn.href = bundle.url;
+                    humbleBtn.target = '_blank';
+                    humbleBtn.rel = 'noopener noreferrer';
+                    humbleBtn.textContent = 'Humble';
+
+                    btnRow.appendChild(detailBtn);
+                    btnRow.appendChild(humbleBtn);
+                    card.appendChild(btnRow);
                     bundlesList.appendChild(card);
                 });
             } catch (err) {

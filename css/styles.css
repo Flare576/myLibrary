@@ -495,6 +495,21 @@ main[data-auth-state="loading"] #authenticated-view {
 .bundle-name {
   margin: 0 0 4px;
   font-size: 1.1rem;
+  font-weight: 600;
+  background: transparent;
+  border: none;
+  color: var(--color-text);
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  min-height: 0;
+  line-height: 1.3;
+  width: 100%;
+}
+
+.bundle-name:hover {
+  background: transparent;
+  color: var(--color-accent);
 }
 
 .bundle-end-date {
@@ -521,13 +536,36 @@ main[data-auth-state="loading"] #authenticated-view {
   border: 1px solid var(--color-accent);
   padding: 5px 12px;
   font-size: 0.8rem;
-  margin-top: 10px;
   border-radius: 4px;
 }
 
 .bundle-detail-btn:hover {
   background-color: var(--color-accent);
   color: #fff;
+}
+
+.bundle-btn-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.bundle-humble-btn {
+  display: inline-flex;
+  align-items: center;
+  background-color: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  padding: 5px 12px;
+  font-size: 0.8rem;
+  border-radius: 4px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.bundle-humble-btn:hover {
+  background-color: var(--color-border);
+  color: var(--color-text);
 }
 
 #bundle-detail-back {

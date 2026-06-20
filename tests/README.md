@@ -1,11 +1,11 @@
 # Tests
 
-189 tests across 16 files (187 passing, 2 known-failing). Two runners: **Bun** (unit) and **Playwright** (integration + browser).
+189 tests across 16 files (189 passing). Two runners: **Bun** (unit) and **Playwright** (integration + browser).
 
 ## Quick start
 
 ```bash
-npm test                   # everything (189 tests — expect 2 known failures: T-BUN-DETAIL-16, T-DESIGN-17)
+npm test                   # everything (189 tests)
 npm run test:unit          # crypto + auth, no server needed
 npm run test:integration   # sync.php live HTTP — needs PHP server on :8181
 npm run test:browser       # index.html in Chromium — needs PHP server on :8181
@@ -32,10 +32,10 @@ php -S 127.0.0.1:8181 router.php &
 | `epic-behavior.spec.js` | Playwright | 6 | `js/epic.js` + `index.html` — connect flow, state shape, error paths, reload, empty library |
 | `itch.spec.js` | Playwright | 11 | `api/itch/*` — init redirect, callback HTML, library.php validation (method guard, missing token, bad token), base tag injection |
 | `itch-behavior.spec.js` | Playwright | 10 | `js/itch.js` + `index.html` — hash callback, token forwarding, connect/disconnect, saveState failure, error, empty library, OAuth denial |
-| `bundles.spec.js` | Playwright | 14 | `api/bundles.php` + `index.html` Bundle Browser — API shape, cache HIT, field validation, 405 guard, DB expires_at, tab switching, card rendering, links, ownership placeholder, logout reset, API error display, empty response |
+| `bundles.spec.js` | Playwright | 14 | `api/bundles.php` + `index.html` Bundle Browser — API shape, cache HIT, field validation, 405 guard, DB expires_at, tab switching, card rendering, Humble outbound link, ownership placeholder, logout reset, API error display, empty response |
 | `bundles-detail.test.js` | Bun | 16 | `js/bundles.js` — computeDetailOwnership (15 cases) + T-BUN-DETAIL-16 null-guard regression (passes — bug fixed in Phase 5) |
 | `bundles-detail.spec.js` | Playwright | 14 | `api/bundles/detail.php` + `index.html` detail panel — API shape, cache HIT, field types, 405/404, panel UI, summary, back button, error, data-owned attr, end-to-end ownership (T-DETAIL-13/14) |
-| `design.spec.js` | Playwright | 20 | Phase 6 design — full-width layout, login centering, nav header, search/filter/sort, platform filtering, tap targets, bundle card structure, urgency indicator, connect button visibility, CSS grid, platform badges, manage-platforms details, owned/unowned visual, dark mode, sort A-Z, disconnect clears grid, search+filter combined, nameless-game crash (1 known-failing: T-DESIGN-17) |
+| `design.spec.js` | Playwright | 20 | Phase 6 design — full-width layout, login centering, nav header, search/filter/sort, platform filtering, tap targets, bundle card structure, urgency indicator, connect button visibility, CSS grid, platform badges, manage-platforms details, owned/unowned visual, dark mode, sort A-Z, disconnect clears grid, search+filter combined, nameless-game crash |
 
 ## Adding tests for a new phase
 
@@ -54,5 +54,5 @@ Tests reference IDs from the strategy (e.g., `T-CRYPTO-02`, `T-SYNC-05`). See `.
 - `sync.spec.js` hits the live DB. Each test generates a unique userId so tests don't stomp each other.
 - `schema.spec.js` spins up a scratch DB (`mylibrary_schema_test`), loads `schema.sql`, verifies column types, then drops the DB. Requires the MariaDB socket at `/tmp/mysql.sock`.
 - `epic-behavior.spec.js` was written in a prior session and is no longer in the working tree. Schema regression coverage lives in `schema.spec.js`.
-- **T-DESIGN-17** is intentionally failing. Bug: `rebuildLibraryGrid` throws `TypeError` when a game entry has no `name` and a search query is active (`undefined.toLowerCase()`). The throw is swallowed by the `setTimeout` callback, leaving the grid stale. Test encodes the correct contract — turns green when a null-guard is added.
-- T-BUN-DETAIL-16 and T-ITCH-JS-01 are both now passing — bugs fixed in Phase 5 and Phase 3 respectively.
+- **T-DESIGN-17** previously tracked a known failing test (nameless-game crash bug). Fixed — all 189 tests pass.
+- T-BUN-DETAIL-16 and T-ITCH-JS-01 are both passing — bugs fixed in Phase 5 and Phase 3 respectively.

@@ -168,7 +168,7 @@ test.describe('T-BUNDLES-UI: Bundle Browser tab UI', () => {
     }
   });
 
-  test('T-BUNDLES-09: each bundle card is an anchor to humblebundle.com with target=_blank', async ({ page }) => {
+  test('T-BUNDLES-09: each bundle card has a Humble button linking to humblebundle.com with target=_blank', async ({ page }) => {
     await loginWithMockBundles(page);
     await page.click('#tab-bundles');
     await page.waitForSelector('#bundles-list .bundle-card');
@@ -179,9 +179,9 @@ test.describe('T-BUNDLES-UI: Bundle Browser tab UI', () => {
 
     for (let i = 0; i < count; i++) {
       const card = cards.nth(i);
-      const href = await card.locator('.bundle-card-link').getAttribute('href');
+      const href = await card.locator('.bundle-humble-btn').getAttribute('href');
       expect(href).toMatch(/^https:\/\/www\.humblebundle\.com\//);
-      expect(await card.locator('.bundle-card-link').getAttribute('target')).toBe('_blank');
+      expect(await card.locator('.bundle-humble-btn').getAttribute('target')).toBe('_blank');
     }
   });
 
