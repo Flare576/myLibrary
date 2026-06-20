@@ -39,7 +39,7 @@ class SteamManager {
       return null;
     }
 
-    const cleanUrl = () => window.history.replaceState({}, document.title, '/');
+    const cleanUrl = () => window.history.replaceState({}, document.title, (window.APP_BASE || '') + '/');
 
     try {
       const steamId = params.get('steamid') ?? '';

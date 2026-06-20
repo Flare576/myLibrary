@@ -59,7 +59,7 @@ class ItchManager {
 
     const cleanUrl = () => {
       if (window.history?.replaceState) {
-        window.history.replaceState({}, document.title, '/');
+        window.history.replaceState({}, document.title, (window.APP_BASE || '') + '/');
       }
     };
 
@@ -117,7 +117,7 @@ class ItchManager {
    * @returns {Promise<object[]>}
    */
   async fetchLibrary(token) {
-    const response = await fetch('/api/itch/library', {
+    const response = await fetch((typeof window !== 'undefined' && window.APP_BASE || '') + '/api/itch/library', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token }),
