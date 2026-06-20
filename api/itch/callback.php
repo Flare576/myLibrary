@@ -27,11 +27,14 @@ if ($html === false) {
 
 // Override APP_BASE to the real app root — window.location.pathname would resolve
 // to /api/itch/callback here, giving the wrong base path.
+// Also inject <base> so relative asset paths (css/, js/) resolve from the app root.
+$baseHref = htmlspecialchars($basePath . '/', ENT_QUOTES, 'UTF-8');
 $html = str_replace(
     'window.APP_BASE = window.location.pathname.replace(/\/$/, \'\') || \'\';',
     'window.APP_BASE = ' . json_encode($basePath) . ';',
     $html
 );
+$html = str_replace('<head>', '<head><base href="' . $baseHref . '">', $html);
 
 header('Content-Type: text/html; charset=utf-8');
 echo $html;
