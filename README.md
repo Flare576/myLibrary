@@ -45,7 +45,7 @@ This is a deliberate tradeoff. You get privacy. The server gets simplicity. Win-
 ## Security
 
 **What the server sees:**
-- Your username (hashed)
+- A `userId` — a derived token computed client-side from your credentials; your actual username never leaves your browser
 - Your encrypted blob (opaque ciphertext)
 - Your IP address (rate limiting)
 - During Epic/itch library fetches: your tokens (not logged, not stored, just in transit)
