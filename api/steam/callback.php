@@ -68,11 +68,15 @@ foreach (explode('&', $rawQuery) as $pair) {
 }
 $postParams['openid.mode'] = 'check_authentication';
 
-// Extract return_to from dot-form params (same source as check_authentication POST).
-// Must be an exact prefix match — nonce in return_to makes it unique per request.
-$returnTo       = $postParams['openid.return_to'] ?? '';
-$expectedPrefix = $appUrl . '/api/steam/callback?nonce=';
-if (!str_starts_with($returnTo, $expectedPrefix)) {
+// Verify return_to points to our callback — protects against open redirect.
+// Use parsed URL comparison to handle encoding differences.
+$returnTo        = $postParams['openid.return_to'] ?? '';
+$returnToParsed  = parse_url(urldecode($returnTo));
+$expectedParsed  = parse_url($appUrl . '/api/steam/callback');
+if (
+    ($returnToParsed['host'] ?? '') !== ($expectedParsed['host'] ?? '') ||
+    ($returnToParsed['path'] ?? '') !== ($expectedParsed['path'] ?? '')
+) {
     redirectError($appUrl, 'Invalid return_to');
 }
 
