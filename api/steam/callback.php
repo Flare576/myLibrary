@@ -31,7 +31,7 @@ function errorOut(string $reason): never
 
 function redirectError(string $appUrl, string $reason): never
 {
-    header("Location: /?steam_error=" . urlencode($reason));
+    header("Location: {$appUrl}/?steam_error=" . urlencode($reason));
     http_response_code(302);
     exit;
 }
@@ -107,6 +107,6 @@ if (!preg_match('|/openid/id/(\d{17})$|', $claimedId, $matches)) {
 $steamId = $matches[1];
 
 // Server never stores SteamID — client receives it via URL and encrypts it client-side
-header("Location: /?steam_connected=1&steamid={$steamId}");
+header("Location: {$appUrl}/?steam_connected=1&steamid={$steamId}");
 http_response_code(302);
 exit;
