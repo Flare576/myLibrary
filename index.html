@@ -427,7 +427,7 @@
             if (pendingSteamError) {
                 const errDiv = document.getElementById('steam-error');
                 if (errDiv) errDiv.textContent = pendingSteamError;
-                window.history.replaceState({}, document.title, '/');
+                window.history.replaceState({}, document.title, (window.APP_BASE || '') + '/');
             }
 
             if (pendingSteamCallback) {
