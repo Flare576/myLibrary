@@ -86,7 +86,7 @@ export const bundleManager = {
   },
 
   async fetchBundleDetail(slug) {
-    const response = await fetch(`/api/bundles/${slug}/detail`);
+    const response = await fetch(`${BUNDLES_API}/${slug}/detail`);
     if (!response.ok) throw new Error(`Bundle detail fetch failed: ${response.status}`);
     return await response.json();
   },
