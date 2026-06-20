@@ -36,9 +36,11 @@ try {
     jsonResponse(500, ['error' => 'Database connection failed']);
 }
 
-$uri    = $_SERVER['REQUEST_URI'] ?? '';
-$path   = parse_url($uri, PHP_URL_PATH) ?? $uri;
-$prefix = '/api/sync/';
+$uri      = $_SERVER['REQUEST_URI'] ?? '';
+$path     = parse_url($uri, PHP_URL_PATH) ?? $uri;
+$appUrl   = rtrim((string) ($config['app']['url'] ?? ''), '/');
+$basePath = rtrim((string) (parse_url($appUrl, PHP_URL_PATH) ?? ''), '/');
+$prefix   = $basePath . '/api/sync/';
 
 if (!str_starts_with($path, $prefix)) {
     jsonResponse(400, ['error' => 'Invalid request path']);
