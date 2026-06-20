@@ -2,6 +2,10 @@ RewriteEngine On
 RewriteBase /myLibrary/
 Options -Indexes
 DirectorySlash Off
+
+# Route bare directory request (no trailing slash) through index.php
+RewriteRule ^$ index.php [L]
+
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteRule ^ index.php [L]
 DirectoryIndex index.php index.html
