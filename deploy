@@ -79,7 +79,12 @@ if [ -z "$dryRun" ]; then
     --exclude .*\.swp \
     --exclude .*\.bkp \
     --exclude ^tags$ \
-    --exclude ^logs/.*
+    --exclude ^logs/.* \
+    --exclude ^\.sisyphus/ \
+    --exclude ^\.git/ \
+    --exclude ^\.ignore$ \
+    --exclude ^\.gitignore$ \
+    --exclude ^\.vroomrc$
   bye
 EOF
 
