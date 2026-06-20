@@ -68,6 +68,7 @@ if [ -z "$dryRun" ]; then
   lcd $MYLIB_LOCAL_DIR
   cd $MYLIB_FTP_REMOTE_DIR
   put config.prod.php -o config.php
+  put router.php -o index.php
   mirror --reverse --verbose \
     --exclude ^config\.php$ \
     --exclude ^config\.prod\.php$ \
