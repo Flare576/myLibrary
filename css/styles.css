@@ -412,15 +412,25 @@ main[data-auth-state="loading"] #authenticated-view {
   display: none;
 }
 
+#bundles-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 4px 0;
+}
+
 .bundle-card {
-  display: block;
+  display: flex;
+  flex-direction: column;
   text-decoration: none;
   color: inherit;
   border: 1px solid var(--color-border);
   border-radius: 6px;
   padding: 12px 16px;
-  margin-bottom: 10px;
+  width: 255px;
+  flex-shrink: 0;
   background: var(--color-surface);
+  box-sizing: border-box;
 }
 
 .bundle-card:hover {
