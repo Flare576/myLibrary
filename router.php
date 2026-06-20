@@ -70,11 +70,4 @@ if (file_exists(__DIR__ . $path) && is_file(__DIR__ . $path)) {
     return false;
 }
 
-$html = file_get_contents(__DIR__ . '/index.html');
-$base = htmlspecialchars($basePath . '/', ENT_QUOTES, 'UTF-8');
-$html = str_replace(
-    '<head>',
-    '<head><base href="' . $base . '"><script>window.APP_BASE=' . json_encode($basePath) . ';</script>',
-    $html
-);
-echo $html;
+require __DIR__ . '/index.html';

@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MyLibrary</title>
     <link rel="stylesheet" href="css/styles.css">
+    <script>
+        window.APP_BASE = window.location.pathname.replace(/\/$/, '') || '';
+    </script>
 </head>
 <body>
     <main id="app-container" data-auth-state="unauthenticated">
