@@ -69,18 +69,17 @@ if [ -z "$dryRun" ]; then
   cd $MYLIB_FTP_REMOTE_DIR
   put config.prod.php -o config.php
   mirror --reverse --verbose \
-    --exclude ^\..*$ \
-    --exclude logs/.* \
-    --exclude .*\.swp \
-    --exclude .*\.bkp \
-    --exclude ^tags$ \
     --exclude ^config\.php$ \
     --exclude ^config\.prod\.php$ \
     --exclude ^node_modules/ \
     --exclude ^test-results/ \
     --exclude ^tests/ \
     --exclude ^screenshots/ \
-    --exclude ^php\.pid$
+    --exclude ^php\.pid$ \
+    --exclude .*\.swp \
+    --exclude .*\.bkp \
+    --exclude ^tags$ \
+    --exclude ^logs/.*
   bye
 EOF
 
