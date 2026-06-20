@@ -75,7 +75,12 @@ if [ -z "$dryRun" ]; then
     --exclude .*\.bkp \
     --exclude ^tags$ \
     --exclude ^config\.php$ \
-    --exclude ^config\.prod\.php$
+    --exclude ^config\.prod\.php$ \
+    --exclude ^node_modules/ \
+    --exclude ^test-results/ \
+    --exclude ^tests/ \
+    --exclude ^screenshots/ \
+    --exclude ^php\.pid$
   bye
 EOF
 
