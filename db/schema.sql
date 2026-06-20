@@ -1,65 +1,44 @@
--- Database: mylibrary_db (create via IONOS cPanel)
--- Full schema with indexes for performance
+-- MyLibrary Phase 0 Schema
+-- Idempotent: drops old v1 tables and all new tables before recreating
 
-CREATE DATABASE IF NOT EXISTS mylibrary_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE mylibrary_db;
+-- Drop old v1 tables
+DROP TABLE IF EXISTS user_accounts;
+DROP TABLE IF EXISTS user_tokens;
 
-CREATE TABLE users (
-    id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
-    email VARCHAR(255) UNIQUE NOT NULL,
-    nickname VARCHAR(100),
-    profile_info JSON,
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_email (email),
-    INDEX idx_active (is_active)
-) ENGINE=InnoDB;
+-- Drop new tables (in FK-safe order)
+DROP TABLE IF EXISTS user_blobs;
+DROP TABLE IF EXISTS bundle_cache;
+DROP TABLE IF EXISTS rate_limits;
+DROP TABLE IF EXISTS users;
 
-CREATE TABLE user_accounts (
-    id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
-    user_id CHAR(36) NOT NULL,
-    ext_system ENUM('steam', 'epic', 'gog', 'itch', 'humble') NOT NULL,
-    ext_id VARCHAR(64),
-    nonce CHAR(36),
-    access_token TEXT NULL,
-    refresh_token TEXT NULL,
-    token_expires_at TIMESTAMP NULL,
-    epic_account_id VARCHAR(64) NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_user_ext (user_id, ext_system),
-    INDEX idx_ext_system (ext_system),
-    INDEX idx_token_expires (token_expires_at),
-    INDEX idx_user_platform_tokens (user_id, ext_system)
-) ENGINE=InnoDB;
+-- Users: just an ID derived from their credentials
+CREATE TABLE IF NOT EXISTS users (
+  id VARCHAR(255) PRIMARY KEY,        -- userId = URL-safe base64 of deterministic encryption
+  created_at TIMESTAMP DEFAULT NOW(),
+  last_seen TIMESTAMP DEFAULT NOW()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE user_tokens (
-    id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
-    user_id CHAR(36) NOT NULL,
-    token CHAR(36) NOT NULL UNIQUE,
-    state ENUM('Pending', 'Validated', 'Disabled') DEFAULT 'Pending',
-    expires_at TIMESTAMP NOT NULL,
-    used_at TIMESTAMP NULL,
-    ip_address VARCHAR(45),
-    user_agent TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_token (token),
-    INDEX idx_state_expires (state, expires_at),
-    INDEX idx_ip_created (ip_address, created_at)
-) ENGINE=InnoDB;
+-- Encrypted blob store
+CREATE TABLE IF NOT EXISTS user_blobs (
+  user_id VARCHAR(255) PRIMARY KEY,
+  `blob` MEDIUMTEXT NOT NULL,          -- JSON string: {iv, ciphertext} -- server never decrypts; MEDIUMTEXT supports ~16MB for large game libraries
+  etag VARCHAR(64),                   -- MD5 of blob for concurrency control
+  updated_at TIMESTAMP DEFAULT NOW() ON UPDATE NOW(),
+  FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE rate_limits (
-    id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
-    user_id CHAR(36) NOT NULL,
-    platform VARCHAR(20) NOT NULL,
-    request_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_user_platform (user_id, platform),
-    INDEX idx_timestamp (request_timestamp),
-    UNIQUE KEY unique_user_platform_time (user_id, platform, request_timestamp)
-) ENGINE=InnoDB;
+-- Bundle cache (public, no user data)
+CREATE TABLE IF NOT EXISTS bundle_cache (
+  slug VARCHAR(255) PRIMARY KEY,
+  data JSON NOT NULL,                 -- full bundle data including tiers + games
+  detail JSON NULL,                   -- tier+game breakdown; NULL = not yet fetched
+  cached_at TIMESTAMP DEFAULT NOW(),
+  expires_at TIMESTAMP NOT NULL       -- = bundle end_date
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Initial data or triggers if needed
--- Cron alternative: Manual cleanup query: DELETE FROM user_tokens WHERE expires_at < NOW();
--- Cleanup old rate limit entries: DELETE FROM rate_limits WHERE request_timestamp < DATE_SUB(NOW(), INTERVAL 1 HOUR);
+-- Rate limiting (blob store + bundle scraper)
+CREATE TABLE IF NOT EXISTS rate_limits (
+  key_hash VARCHAR(64) PRIMARY KEY,   -- hash of IP or userId
+  requests INT DEFAULT 1,
+  window_start TIMESTAMP DEFAULT NOW()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

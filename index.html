@@ -3,99 +3,597 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MyLibrary Game Library Aggregator</title>
+    <title>MyLibrary</title>
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-    <!-- Unauthenticated State -->
-    <div id="unauthenticated" data-auth-state="unauthenticated">
-        <div class="auth-container">
-            <h1>Welcome to MyLibrary</h1>
-            <p>Enter your email to get started with passwordless login.</p>
-            <form id="email-form">
-                <input type="email" id="email-input" placeholder="your@email.com" required aria-label="Email address">
-                <button type="submit" class="submit-btn">Send Token</button>
+    <main id="app-container" data-auth-state="unauthenticated">
+        <div id="unauthenticated-view" class="card">
+            <h2>Sign In</h2>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="passphrase">Passphrase</label>
+                    <input type="password" id="passphrase" name="passphrase" required autocomplete="current-password">
+                </div>
+                <button type="submit" id="login-btn">Sign In</button>
+                <div id="login-error"></div>
             </form>
-            <div id="error-message" class="error-toast" style="display: none;"></div>
         </div>
-    </div>
 
-    <!-- Pending State -->
-    <div id="pending" data-auth-state="pending" style="display: none;">
-        <div class="auth-container">
-            <h1>Check Your Email</h1>
-            <p>We've sent a verification link to your email. Click it to continue.</p>
-            <div class="polling-indicator">⏳ Verifying...</div>
-            <button id="resend-btn" class="submit-btn">Resend Token</button>
+        <div id="authenticated-view">
+            <header id="app-header">
+                <div class="header-left">
+                    <h1 class="app-title">MyLibrary</h1>
+                    <span id="welcome-msg" class="visually-hidden">Welcome</span>
+                </div>
+                <nav id="view-tabs">
+                    <button id="tab-library" class="tab-btn tab-active">Library</button>
+                    <button id="tab-bundles" class="tab-btn">Bundles</button>
+                </nav>
+                <div class="header-right">
+                    <button id="logout-btn" class="logout-link">Sign Out</button>
+                </div>
+            </header>
+            
+            <div id="content-area">
+                <div id="library-view">
+                    <div id="library-toolbar">
+                        <input type="search" id="library-search" placeholder="Search games…">
+                        <div id="platform-filters">
+                            <button class="filter-chip active" data-platform="all">All</button>
+                            <button class="filter-chip" data-platform="steam">Steam</button>
+                            <button class="filter-chip" data-platform="epic">Epic</button>
+                            <button class="filter-chip" data-platform="itch">itch.io</button>
+                        </div>
+                        <select id="library-sort">
+                            <option value="az">A-Z</option>
+                            <option value="platform">Platform</option>
+                        </select>
+                    </div>
+
+                    <details id="manage-platforms" open>
+                        <summary>Manage Platforms</summary>
+                        <div class="manage-platforms-content">
+                            <div class="platform-connect-card">
+                                <span class="platform-badge platform-steam">Steam</span>
+                                <button id="steam-connect-btn" class="platform-btn">Connect Steam</button>
+                                <div id="steam-error" class="platform-error"></div>
+                                <section id="steam-library" style="display:none">
+                                    <p id="steam-game-count">Steam: 0 games</p>
+                                    <button id="steam-disconnect-btn" class="platform-btn platform-btn-disconnect">Disconnect</button>
+                                </section>
+                            </div>
+
+                            <div class="platform-connect-card">
+                                <span class="platform-badge platform-epic">Epic</span>
+                                <section id="epic-connect-section">
+                                    <p class="platform-instructions">Log into epicgames.com, then open the link below. Copy the <code>authorizationCode</code> value from the JSON and paste it here.</p>
+                                    <a id="epic-open-btn" href="#" target="_blank" rel="noopener noreferrer" class="platform-link">Open Epic authorization page ↗</a>
+                                    <input type="text" id="epic-code-input" class="platform-input" placeholder="Paste authorizationCode here…">
+                                    <button id="epic-connect-btn" class="platform-btn">Connect Epic</button>
+                                    <div id="epic-error" class="platform-error"></div>
+                                </section>
+                                <section id="epic-library" style="display:none">
+                                    <p id="epic-game-count">Epic: 0 games</p>
+                                    <button id="epic-disconnect-btn" class="platform-btn platform-btn-disconnect">Disconnect</button>
+                                </section>
+                            </div>
+
+                            <div class="platform-connect-card">
+                                <span class="platform-badge platform-itch">itch.io</span>
+                                <section id="itch-connect-section">
+                                    <p class="platform-instructions">Connect your itch.io account to import your owned games library.</p>
+                                    <button id="itch-connect-btn" class="platform-btn">Connect itch.io</button>
+                                    <div id="itch-error" class="platform-error"></div>
+                                </section>
+                                <section id="itch-library" style="display:none">
+                                    <p id="itch-game-count">itch.io: 0 games</p>
+                                    <button id="itch-disconnect-btn" class="platform-btn platform-btn-disconnect">Disconnect</button>
+                                </section>
+                            </div>
+                        </div>
+                    </details>
+
+                    <div id="library-grid"></div>
+                </div>
+
+                <div id="bundles-view" style="display:none">
+                    <div id="bundles-loading" style="display:none">Loading bundles…</div>
+                    <div id="bundles-error" style="display:none; color:red"></div>
+                    <div id="bundles-list"></div>
+                    <div id="bundle-detail" style="display:none">
+                        <button id="bundle-detail-back">← Back to bundles</button>
+                        <div id="bundle-detail-loading" style="display:none">Loading…</div>
+                        <div id="bundle-detail-error" style="display:none; color:red"></div>
+                        <div id="bundle-detail-content"></div>
+                    </div>
+                </div>
+            </div>
         </div>
-    </div>
+    </main>
 
-    <!-- Validated State - Dashboard -->
-    <div id="dashboard" data-auth-state="validated" style="display: none;">
-        <header>
-            <h1>MyLibrary Dashboard</h1>
-            <div id="user-info"></div>
-            <div class="header-buttons">
-                <button id="nuke-btn">Nuke</button>
-                <button id="logout-btn">Logout</button>
-            </div>
-        </header>
+    <script type="module">
+        import { authManager } from './js/auth.js';
+        import { steamManager } from './js/steam.js';
+        import { epicManager } from './js/epic.js';
+        import { itchManager } from './js/itch.js';
+        import { bundleManager } from './js/bundles.js';
 
-        <section id="platforms-section">
-            <h2>Connect Platforms</h2>
-            <div id="platforms-grid" class="platform-grid">
-                <div class="platform-card" data-platform="steam" data-status="disconnected">
-                    <div class="platform-icon">🟦</div>
-                    <h3>Steam</h3>
-                    <p>Connect your Steam library</p>
-                    <button class="connect-btn">Connect</button>
-                </div>
-                <div class="platform-card" data-platform="epic" data-status="disconnected">
-                    <div class="platform-icon">🟦</div>
-                    <h3>Epic Games</h3>
-                    <p>Connect your Epic library</p>
-                    <button class="connect-btn">Connect</button>
-                </div>
-                <div class="platform-card" data-platform="gog" data-status="disconnected">
-                    <div class="platform-icon">🟣</div>
-                    <h3>GOG</h3>
-                    <p>Connect your GOG library</p>
-                    <button class="connect-btn">Connect</button>
-                </div>
-                <div class="platform-card" data-platform="itch" data-status="disconnected">
-                    <div class="platform-icon">🔴</div>
-                    <h3>itch.io</h3>
-                    <p>Connect your itch.io collection</p>
-                    <button class="connect-btn">Connect</button>
-                </div>
-                <div class="platform-card" data-platform="humble" data-status="disconnected">
-                    <div class="platform-icon">🟠</div>
-                    <h3>Humble Bundle</h3>
-                    <p>Connect your Humble library</p>
-                    <button class="connect-btn">Connect</button>
-                </div>
-            </div>
-        </section>
+        const appContainer = document.getElementById('app-container');
+        const loginForm = document.getElementById('login-form');
+        const loginBtn = document.getElementById('login-btn');
+        const loginError = document.getElementById('login-error');
+        const logoutBtn = document.getElementById('logout-btn');
+        const welcomeMsg = document.getElementById('welcome-msg');
+        const usernameInput = document.getElementById('username');
+        const passphraseInput = document.getElementById('passphrase');
+        const steamConnectBtn = document.getElementById('steam-connect-btn');
+        const steamLibrary = document.getElementById('steam-library');
+        const steamGameCount = document.getElementById('steam-game-count');
+        const epicOpenBtn = document.getElementById('epic-open-btn');
+        const epicConnectBtn = document.getElementById('epic-connect-btn');
+        const epicCodeInput = document.getElementById('epic-code-input');
+        const epicConnectSection = document.getElementById('epic-connect-section');
+        const epicLibrary = document.getElementById('epic-library');
+        const epicGameCount = document.getElementById('epic-game-count');
+        const epicError = document.getElementById('epic-error');
+        const itchConnectSection = document.getElementById('itch-connect-section');
+        const itchLibrary = document.getElementById('itch-library');
+        const itchGameCount = document.getElementById('itch-game-count');
+        const itchError = document.getElementById('itch-error');
 
-        <section id="games-section" style="display: none;">
-            <div class="controls">
-                <input type="text" id="search-input" placeholder="Search games..." aria-label="Search games">
-                <div class="filter-bar" id="filter-bar">
-                    <button class="filter-btn active" data-platform="all">All</button>
-                    <button class="filter-btn" data-platform="steam">Steam</button>
-                    <button class="filter-btn" data-platform="epic">Epic</button>
-                    <button class="filter-btn" data-platform="gog">GOG</button>
-                    <button class="filter-btn" data-platform="itch">itch.io</button>
-                    <button class="filter-btn" data-platform="humble">Humble</button>
-                </div>
-            </div>
-            <div id="game-grid" class="game-grid"></div>
-            <div id="cache-indicator" class="cache-footer">
-                <p>Data updated <span>never</span></p>
-            </div>
-        </section>
-    </div>
+        const libraryView = document.getElementById('library-view');
+        const bundlesView = document.getElementById('bundles-view');
+        const tabLibrary = document.getElementById('tab-library');
+        const tabBundles = document.getElementById('tab-bundles');
 
-    <script src="js/app.js" type="module"></script>
+        let allGames = [];
+
+        function rebuildLibraryGrid() {
+            const query = document.getElementById('library-search').value.toLowerCase();
+            const activePlatform = document.querySelector('.filter-chip.active').dataset.platform;
+            const sort = document.getElementById('library-sort').value;
+            
+            let filtered = allGames.filter(g => {
+                if (activePlatform !== 'all' && g.platform !== activePlatform) return false;
+                if (query && !g.name.toLowerCase().includes(query)) return false;
+                return true;
+            });
+            
+            if (sort === 'az') filtered.sort((a, b) => a.name.localeCompare(b.name));
+            else if (sort === 'platform') filtered.sort((a, b) => a.platform.localeCompare(b.platform));
+            
+            const grid = document.getElementById('library-grid');
+            grid.textContent = '';
+            filtered.forEach(g => {
+                const card = document.createElement('div');
+                card.className = 'game-card';
+                card.dataset.platform = g.platform;
+
+                const badge = document.createElement('span');
+                badge.className = `platform-badge platform-${g.platform}`;
+                badge.textContent = g.platform === 'itch' ? 'itch.io' : g.platform.charAt(0).toUpperCase() + g.platform.slice(1);
+
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'game-name';
+                nameSpan.textContent = g.name;
+
+                card.appendChild(badge);
+                card.appendChild(nameSpan);
+                grid.appendChild(card);
+            });
+        }
+
+        let searchTimer;
+        document.getElementById('library-search').addEventListener('input', () => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(rebuildLibraryGrid, 150);
+        });
+
+        document.querySelectorAll('.filter-chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+                chip.classList.add('active');
+                rebuildLibraryGrid();
+            });
+        });
+
+        document.getElementById('library-sort').addEventListener('change', rebuildLibraryGrid);
+
+        const pageParams = new URLSearchParams(window.location.search);
+        const pendingSteamCallback = pageParams.get('steam_connected') === '1';
+        const pendingSteamError = pageParams.get('steam_error') ?? null;
+        const pendingItchCallback = window.location.hash.includes('access_token') || window.location.hash.includes('error=');
+
+        epicOpenBtn.href = epicManager.getRedirectUrl();
+
+        tabLibrary.addEventListener('click', () => {
+            libraryView.style.display = '';
+            bundlesView.style.display = 'none';
+            tabLibrary.classList.add('tab-active');
+            tabBundles.classList.remove('tab-active');
+            document.getElementById('bundles-list').style.display = '';
+            document.getElementById('bundle-detail').style.display = 'none';
+        });
+
+        tabBundles.addEventListener('click', async () => {
+            libraryView.style.display = 'none';
+            bundlesView.style.display = '';
+            tabLibrary.classList.remove('tab-active');
+            tabBundles.classList.add('tab-active');
+            await loadBundles();
+        });
+
+        async function loadBundles() {
+            const bundlesLoading = document.getElementById('bundles-loading');
+            const bundlesError = document.getElementById('bundles-error');
+            const bundlesList = document.getElementById('bundles-list');
+
+            bundlesLoading.style.display = '';
+            bundlesError.style.display = 'none';
+            bundlesList.textContent = '';
+
+            try {
+                const state = authManager.getState();
+                const ownedSet = bundleManager.buildOwnedSet(state || {});
+                const rawBundles = await bundleManager.fetchBundles();
+                const bundles = bundleManager.computeOwnershipSummary(rawBundles, ownedSet);
+
+                bundlesLoading.style.display = 'none';
+
+                if (bundles.length === 0) {
+                    bundlesList.textContent = 'No active bundles found.';
+                    return;
+                }
+
+                bundles.forEach(bundle => {
+                    const card = document.createElement('div');
+                    card.className = 'bundle-card';
+
+                    const cardLink = document.createElement('a');
+                    cardLink.className = 'bundle-card-link';
+                    cardLink.href = bundle.url;
+                    cardLink.target = '_blank';
+                    cardLink.rel = 'noopener noreferrer';
+
+                    const name = document.createElement('h3');
+                    name.className = 'bundle-name';
+                    name.textContent = bundle.name;
+
+                    cardLink.appendChild(name);
+
+                    const endDate = document.createElement('p');
+                    endDate.className = 'bundle-end-date';
+                    const d = new Date(bundle.end_date);
+                    const daysLeft = Math.ceil((d - Date.now()) / (1000 * 60 * 60 * 24));
+                    if (daysLeft < 3) endDate.classList.add('bundle-expiring-soon');
+                    endDate.textContent = `Ends ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+
+                    const ownership = document.createElement('p');
+                    ownership.className = 'bundle-ownership';
+                    const owned = bundle.owned_count ?? null;
+                    const total = bundle.total_count ?? '—';
+                    ownership.textContent = owned !== null
+                        ? `${total} games — ${owned} you don't own`
+                        : `${total} games`;
+
+                    card.appendChild(cardLink);
+                    card.appendChild(endDate);
+                    card.appendChild(ownership);
+
+                    const detailBtn = document.createElement('button');
+                    detailBtn.className = 'bundle-detail-btn';
+                    detailBtn.dataset.slug = bundle.slug;
+                    detailBtn.textContent = 'Details';
+
+                    card.appendChild(detailBtn);
+                    bundlesList.appendChild(card);
+                });
+            } catch (err) {
+                bundlesLoading.style.display = 'none';
+                bundlesError.textContent = err.message || 'Failed to load bundles';
+                bundlesError.style.display = '';
+            }
+        }
+
+        async function loadBundleDetail(slug) {
+            const bundlesList = document.getElementById('bundles-list');
+            const detailPanel = document.getElementById('bundle-detail');
+            const detailLoading = document.getElementById('bundle-detail-loading');
+            const detailError = document.getElementById('bundle-detail-error');
+            const detailContent = document.getElementById('bundle-detail-content');
+
+            bundlesList.style.display = 'none';
+            detailPanel.style.display = '';
+            detailLoading.style.display = '';
+            detailError.style.display = 'none';
+            detailContent.textContent = '';
+
+            try {
+                const state = authManager.getState();
+                const ownedSet = bundleManager.buildOwnedSet(state || {});
+                const raw = await bundleManager.fetchBundleDetail(slug);
+                const detail = bundleManager.computeDetailOwnership(raw, ownedSet);
+
+                detailLoading.style.display = 'none';
+
+                const header = document.createElement('div');
+                header.className = 'bundle-detail-header';
+                const unownedCount = detail.unowned_count;
+                const totalCount = detail.total_count;
+                const valueScore = detail.value_score;
+                const summary = document.createElement('p');
+                summary.className = 'bundle-detail-summary';
+                summary.textContent = `${unownedCount} of ${totalCount} games you don't own — $${valueScore.toFixed(2)} value`;
+                header.appendChild(summary);
+                detailContent.appendChild(header);
+
+                detail.tiers.forEach(tier => {
+                    if (tier.items.length === 0) return;
+                    const tierEl = document.createElement('section');
+                    tierEl.className = 'bundle-tier';
+                    const tierHeader = document.createElement('h3');
+                    tierHeader.className = 'bundle-tier-header';
+                    tierHeader.textContent = tier.price_label;
+                    tierEl.appendChild(tierHeader);
+
+                    tier.items.forEach(game => {
+                        const gameEl = document.createElement('div');
+                        gameEl.className = `bundle-game ${game.owned ? 'game-owned' : 'game-unowned'}`;
+                        gameEl.dataset.owned = game.owned ? 'true' : 'false';
+                        const nameSpan = document.createElement('span');
+                        nameSpan.className = 'game-name';
+                        nameSpan.textContent = game.human_name;
+                        const ownedSpan = document.createElement('span');
+                        ownedSpan.className = 'game-owned-indicator';
+                        ownedSpan.textContent = game.owned ? '✓ Owned' : 'Not owned';
+                        const msrpSpan = document.createElement('span');
+                        msrpSpan.className = 'game-msrp';
+                        msrpSpan.textContent = game.msrp > 0 ? `$${game.msrp.toFixed(2)}` : '';
+                        gameEl.appendChild(nameSpan);
+                        gameEl.appendChild(ownedSpan);
+                        gameEl.appendChild(msrpSpan);
+                        tierEl.appendChild(gameEl);
+                    });
+
+                    detailContent.appendChild(tierEl);
+                });
+            } catch (err) {
+                detailLoading.style.display = 'none';
+                detailError.textContent = err.message || 'Failed to load bundle details';
+                detailError.style.display = '';
+            }
+        }
+
+        document.getElementById('bundle-detail-back').addEventListener('click', () => {
+            document.getElementById('bundle-detail').style.display = 'none';
+            document.getElementById('bundles-list').style.display = '';
+        });
+
+        document.getElementById('bundles-list').addEventListener('click', (e) => {
+            const btn = e.target.closest('.bundle-detail-btn');
+            if (btn) {
+                e.preventDefault();
+                e.stopPropagation();
+                loadBundleDetail(btn.dataset.slug);
+            }
+        });
+
+        function renderSteamGames(games) {
+            allGames = allGames.filter(g => g.platform !== 'steam');
+            (games || []).forEach(game => {
+                if (game.name) allGames.push({ name: game.name, platform: 'steam' });
+            });
+            rebuildLibraryGrid();
+            const n = (games || []).length;
+            steamGameCount.textContent = `Steam: ${n} ${n === 1 ? 'game' : 'games'}`;
+        }
+
+        function renderEpicGames(games) {
+            allGames = allGames.filter(g => g.platform !== 'epic');
+            (games || []).forEach(game => {
+                if (game.name) allGames.push({ name: game.name, platform: 'epic' });
+            });
+            rebuildLibraryGrid();
+            const n = (games || []).length;
+            epicGameCount.textContent = `Epic: ${n} games`;
+        }
+
+        function renderItchGames(games) {
+            allGames = allGames.filter(g => g.platform !== 'itch');
+            (games || []).forEach(game => {
+                if (game.name) allGames.push({ name: game.name, platform: 'itch' });
+            });
+            rebuildLibraryGrid();
+            const n = (games || []).length;
+            itchGameCount.textContent = `itch.io: ${n} games`;
+        }
+
+        document.addEventListener('auth:login', async (event) => {
+            const { username, state } = event.detail;
+            appContainer.dataset.authState = 'authenticated';
+            welcomeMsg.textContent = `Welcome, ${username}`;
+
+            if (state.steam || state.epic || state.itch) {
+                document.getElementById('manage-platforms').removeAttribute('open');
+            }
+            if (pendingSteamError) {
+                const errDiv = document.getElementById('steam-error');
+                if (errDiv) errDiv.textContent = pendingSteamError;
+                window.history.replaceState({}, document.title, '/');
+            }
+
+            if (pendingSteamCallback) {
+                await steamManager.handleCallback(authManager);
+            } else if (state.steam) {
+                renderSteamGames(state.steam.games);
+                steamConnectBtn.style.display = 'none';
+                steamLibrary.style.display = '';
+            }
+
+            if (state.epic) {
+                renderEpicGames(state.epic.games);
+                epicConnectSection.style.display = 'none';
+                epicLibrary.style.display = '';
+            }
+
+            if (pendingItchCallback) {
+                await itchManager.handleCallback(authManager);
+            } else if (state.itch) {
+                renderItchGames(state.itch.games);
+                itchConnectSection.style.display = 'none';
+                itchLibrary.style.display = '';
+            }
+        });
+
+        document.addEventListener('auth:logout', () => {
+            appContainer.dataset.authState = 'unauthenticated';
+            loginForm.reset();
+            loginError.textContent = '';
+            allGames = [];
+            rebuildLibraryGrid();
+            steamConnectBtn.style.display = '';
+            steamLibrary.style.display = 'none';
+            epicLibrary.style.display = 'none';
+            epicConnectSection.style.display = '';
+            epicError.textContent = '';
+            itchLibrary.style.display = 'none';
+            itchConnectSection.style.display = '';
+            itchError.textContent = '';
+            libraryView.style.display = '';
+            bundlesView.style.display = 'none';
+            tabLibrary.classList.add('tab-active');
+            tabBundles.classList.remove('tab-active');
+            document.getElementById('bundle-detail').style.display = 'none';
+            document.getElementById('bundles-list').style.display = '';
+        });
+
+        document.addEventListener('steam:connected', (event) => {
+            const { games } = event.detail;
+            renderSteamGames(games);
+            steamConnectBtn.style.display = 'none';
+            steamLibrary.style.display = '';
+        });
+
+        document.addEventListener('steam:disconnected', () => {
+            allGames = allGames.filter(g => g.platform !== 'steam');
+            rebuildLibraryGrid();
+            steamConnectBtn.style.display = '';
+            steamLibrary.style.display = 'none';
+        });
+
+        document.addEventListener('steam:error', (event) => {
+            const msg = event.detail?.message || 'Steam connection failed';
+            const errDiv = document.getElementById('steam-error');
+            if (errDiv) errDiv.textContent = msg;
+        });
+
+        document.addEventListener('epic:connected', (event) => {
+            const { games } = event.detail;
+            renderEpicGames(games);
+            epicConnectSection.style.display = 'none';
+            epicLibrary.style.display = '';
+        });
+
+        document.addEventListener('epic:disconnected', () => {
+            allGames = allGames.filter(g => g.platform !== 'epic');
+            rebuildLibraryGrid();
+            epicLibrary.style.display = 'none';
+            epicConnectSection.style.display = '';
+        });
+
+        document.addEventListener('epic:error', (event) => {
+            const msg = event.detail?.message || 'Epic connection failed';
+            epicError.textContent = msg;
+        });
+
+        document.addEventListener('itch:connected', (event) => {
+            const { games } = event.detail;
+            renderItchGames(games);
+            itchConnectSection.style.display = 'none';
+            itchLibrary.style.display = '';
+        });
+
+        document.addEventListener('itch:disconnected', () => {
+            allGames = allGames.filter(g => g.platform !== 'itch');
+            rebuildLibraryGrid();
+            itchLibrary.style.display = 'none';
+            itchConnectSection.style.display = '';
+        });
+
+        document.addEventListener('itch:error', (event) => {
+            const msg = event.detail?.message || 'itch.io connection failed';
+            itchError.textContent = msg;
+        });
+
+        steamConnectBtn.addEventListener('click', () => steamManager.connectSteam());
+        document.getElementById('steam-disconnect-btn').addEventListener('click', () => {
+            steamManager.disconnectSteam(authManager);
+        });
+
+        epicConnectBtn.addEventListener('click', () => epicManager.connectEpic(epicCodeInput.value.trim(), authManager));
+        document.getElementById('epic-disconnect-btn').addEventListener('click', () => {
+            epicManager.disconnectEpic(authManager);
+        });
+
+        document.getElementById('itch-connect-btn').addEventListener('click', () => {
+            window.location.href = '/api/itch/init';
+        });
+        document.getElementById('itch-disconnect-btn').addEventListener('click', () => {
+            itchManager.disconnectItch(authManager);
+        });
+
+        const SESSION_KEY = 'ml_session';
+
+        function saveSession(username, passphrase) {
+            sessionStorage.setItem(SESSION_KEY, JSON.stringify({ username, passphrase }));
+        }
+
+        function clearSession() {
+            sessionStorage.removeItem(SESSION_KEY);
+        }
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = usernameInput.value;
+            const passphrase = passphraseInput.value;
+
+            if (!username || !passphrase) return;
+
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Signing in…';
+            loginError.textContent = '';
+
+            try {
+                await authManager.login(username, passphrase);
+                saveSession(username, passphrase);
+            } catch (err) {
+                loginError.textContent = err.message || 'Login failed';
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Sign In';
+            }
+        });
+
+        logoutBtn.addEventListener('click', () => {
+            clearSession();
+            authManager.logout();
+            loginBtn.disabled = false;
+            loginBtn.textContent = 'Sign In';
+        });
+
+        const storedSession = sessionStorage.getItem(SESSION_KEY);
+        if (storedSession) {
+            try {
+                const { username, passphrase } = JSON.parse(storedSession);
+                await authManager.login(username, passphrase);
+            } catch (_e) {
+                clearSession();
+            }
+        }
+    </script>
 </body>
 </html>

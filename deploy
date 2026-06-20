@@ -1,0 +1,92 @@
+#!/bin/bash
+version=0.2.0
+usage="$(basename "$0") [-hvpmn]
+Deploy to the MYLIB
+
+-h[Help]          Prints this message, then exits
+-v[Version]       Prints this version info, then exits
+-p[Post]          Also initiate a post to BlueSky afterward
+-m[Message]       Also do git commit with this message
+-n[No-op]         Does not upload, but does generate files
+"
+
+while getopts ':hvpm:n' option; do
+  case "$option" in
+    h) echo "$usage"
+      exit
+      ;;
+    v) echo "version $version"
+      exit
+      ;;
+    p) post="true"
+      ;;
+    m) message="$OPTARG"
+      ;;
+    n) dryRun="true"
+      ;;
+    *) echo "Unknown Option '$OPTARG', exiting"
+      exit
+      ;;
+  esac
+done
+shift $((OPTIND -1))
+
+# === CONFIG ===
+# These should be set as environment variables:
+# MYLIB_FTP_HOST        → domain or IP of your SFTP server
+# MYLIB_FTP_USER        → your SFTP username
+# MYLIB_FTP_PASS        → your SFTP password
+# MYLIB_FTP_PORT        → optional, defaults to 22 for SFTP
+# MYLIB_FTP_REMOTE_DIR  → where to upload the files (e.g. /public_html)
+# MYLIB_LOCAL_DIR       → what to upload (e.g. ./dist or .)
+
+# === VALIDATION ===
+if [[ -z "$MYLIB_FTP_HOST" || -z "$MYLIB_FTP_USER" || -z "$MYLIB_FTP_PASS" || -z "$MYLIB_FTP_REMOTE_DIR" || -z "$MYLIB_LOCAL_DIR" ]]; then
+  echo "One or more required MYLIB_* environment variables are missing."
+  echo "Make sure MYLIB_FTP_HOST, MYLIB_FTP_USER, MYLIB_FTP_PASS, MYLIB_FTP_REMOTE_DIR, and MYLIB_LOCAL_DIR are set."
+  exit 1
+fi
+
+if ! command -v lftp &> /dev/null; then
+  echo "You're gonna need lftp to publish with this script, friend.";
+  exit 1;
+fi
+
+MYLIB_FTP_PORT=${MYLIB_FTP_PORT:-22}
+
+# === DEPLOY ===
+# Excludes Explanation
+# ^\..*$ : any files starting with a dot
+# .*\.swp : any files with `.swp` in the name
+# .*\.bkp : any files with `.bkp` in the name
+# ^tags$ : a file named `tags` in the root dir
+
+if [ -z "$dryRun" ]; then
+  echo "Deploying site via SFTP to $MYLIB_FTP_HOST:$MYLIB_FTP_REMOTE_DIR ..."
+
+  lftp -u "$MYLIB_FTP_USER","$MYLIB_FTP_PASS" "sftp://$MYLIB_FTP_HOST:$MYLIB_FTP_PORT" <<EOF
+  lcd $MYLIB_LOCAL_DIR
+  cd $MYLIB_FTP_REMOTE_DIR
+  put config.prod.php -o config.php
+  mirror --reverse --verbose \
+    --exclude ^\..*$ \
+    --exclude logs/.* \
+    --exclude .*\.swp \
+    --exclude .*\.bkp \
+    --exclude ^tags$ \
+    --exclude ^config\.php$ \
+    --exclude ^config\.prod\.php$
+  bye
+EOF
+
+  echo "✅ MYLIB deployment complete via SFTP!"
+else
+  echo "Dry run, skipping upload"
+fi
+
+# ===   Git   ===
+if [ -n "$message" ]; then
+  git add .
+  git commit -m "$message"
+#  git push
+fi
