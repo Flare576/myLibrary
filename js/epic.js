@@ -12,7 +12,7 @@
  *   3. connectEpic(code) → POST to /api/epic/exchange, store tokens+games in blob
  */
 
-const EPIC_EXCHANGE_API = '/api/epic/exchange';
+const EPIC_EXCHANGE_API = (window.APP_BASE ?? '') + '/api/epic/exchange';
 const EPIC_REDIRECT_URL =
   'https://www.epicgames.com/id/api/redirect?clientId=34a02cf8f4414e29b15921876da36f9a&responseType=code';
 

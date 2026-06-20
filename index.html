@@ -541,7 +541,7 @@
         });
 
         document.getElementById('itch-connect-btn').addEventListener('click', () => {
-            window.location.href = '/api/itch/init';
+            window.location.href = (window.APP_BASE ?? '') + '/api/itch/init';
         });
         document.getElementById('itch-disconnect-btn').addEventListener('click', () => {
             itchManager.disconnectItch(authManager);

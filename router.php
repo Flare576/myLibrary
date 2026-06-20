@@ -1,6 +1,19 @@
 <?php
 
+$config  = require __DIR__ . '/config.php';
+$appUrl  = rtrim((string) ($config['app']['url'] ?? ''), '/');
+$basePath = parse_url($appUrl, PHP_URL_PATH) ?? '';
+$basePath = rtrim($basePath, '/');
+
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+
+// Strip subdirectory prefix so routes match regardless of install location
+if ($basePath !== '' && str_starts_with($path, $basePath)) {
+    $path = substr($path, strlen($basePath));
+}
+if ($path === '' || $path[0] !== '/') {
+    $path = '/' . $path;
+}
 
 if (str_starts_with($path, '/api/sync/')) {
     require __DIR__ . '/api/sync.php';
@@ -57,4 +70,11 @@ if (file_exists(__DIR__ . $path) && is_file(__DIR__ . $path)) {
     return false;
 }
 
-require __DIR__ . '/index.html';
+$html = file_get_contents(__DIR__ . '/index.html');
+$base = htmlspecialchars($basePath . '/', ENT_QUOTES, 'UTF-8');
+$html = str_replace(
+    '<head>',
+    '<head><base href="' . $base . '"><script>window.APP_BASE=' . json_encode($basePath) . ';</script>',
+    $html
+);
+echo $html;

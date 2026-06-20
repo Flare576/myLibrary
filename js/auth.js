@@ -1,6 +1,6 @@
 import { generateUserId, encrypt, decrypt } from './crypto.js';
 
-const SYNC_API = '/api/sync/';
+const SYNC_API = (window.APP_BASE ?? '') + '/api/sync/';
 
 const EMPTY_STATE = () => ({
   steam: null,

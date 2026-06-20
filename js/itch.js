@@ -7,7 +7,7 @@
  * blob via AuthManager. No UI logic lives here — only data and network concerns.
  */
 
-const ITCH_INIT_URL = '/api/itch/init';
+const ITCH_INIT_URL = (window.APP_BASE ?? '') + '/api/itch/init';
 
 /**
  * Convert an itch.io owned-keys response into MyLibrary game entries.

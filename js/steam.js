@@ -11,7 +11,7 @@
  *   3. handleCallback()   → detect params, fetch games, persist to blob, clean URL
  */
 
-const STEAM_GAMES_API = '/api/steam/games';
+const STEAM_GAMES_API = (window.APP_BASE ?? '') + '/api/steam/games';
 const STEAMID_RE = /^\d{17}$/;
 
 class SteamManager {
@@ -20,7 +20,7 @@ class SteamManager {
    * Navigates away — server handles the rest and redirects back.
    */
   connectSteam() {
-    window.location.href = '/api/steam/init';
+    window.location.href = (window.APP_BASE ?? '') + '/api/steam/init';
   }
 
   /**
