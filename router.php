@@ -67,7 +67,20 @@ if (str_starts_with($path, '/api/bundles')) {
 }
 
 if (file_exists(__DIR__ . $path) && is_file(__DIR__ . $path)) {
-    return false;
+    // Serve static files directly — works for both PHP built-in server and Apache
+    $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+    $mime = match($ext) {
+        'css'  => 'text/css',
+        'js'   => 'application/javascript',
+        'png'  => 'image/png',
+        'jpg', 'jpeg' => 'image/jpeg',
+        'svg'  => 'image/svg+xml',
+        'ico'  => 'image/x-icon',
+        default => 'application/octet-stream',
+    };
+    header("Content-Type: $mime");
+    readfile(__DIR__ . $path);
+    exit;
 }
 
-require __DIR__ . '/index.html';
+readfile(__DIR__ . '/index.html');
