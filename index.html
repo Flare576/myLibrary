@@ -30,7 +30,7 @@
         <div id="authenticated-view">
             <header id="app-header">
                 <div class="header-left">
-                    <h1 class="app-title">MyLibrary</h1>
+                    <h1 class="app-title"><button id="logo-btn" class="logo-btn">MyLibrary</button></h1>
                     <span id="welcome-msg" class="visually-hidden">Welcome</span>
                 </div>
                 <nav id="view-tabs">
@@ -126,6 +126,9 @@
                 </div>
             </div>
         </div>
+        <footer id="app-footer">
+            Made by <a href="https://flare576.com" target="_blank" rel="noopener noreferrer">Flare576</a> as part of a <a href="https://flare576.com/meta/programming/ai/project-introduction.html" target="_blank" rel="noopener noreferrer">How To Code</a> tutorial. View the project at <a href="https://github.com/Flare576/myLibrary/" target="_blank" rel="noopener noreferrer">GitHub</a>!
+        </footer>
     </main>
 
     <script type="module">
@@ -230,6 +233,10 @@
             tabBundles.classList.remove('tab-active');
             document.getElementById('bundles-list').style.display = '';
             document.getElementById('bundle-detail').style.display = 'none';
+        });
+
+        document.getElementById('logo-btn').addEventListener('click', () => {
+            tabLibrary.click();
         });
 
         tabBundles.addEventListener('click', async () => {

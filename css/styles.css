@@ -84,6 +84,41 @@ main {
   color: var(--color-accent);
 }
 
+.logo-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-accent);
+  font-size: 1.25rem;
+  font-weight: bold;
+  padding: 0 8px;
+  cursor: pointer;
+  min-height: 44px;
+  line-height: 1;
+}
+
+.logo-btn:hover {
+  background: transparent;
+  color: var(--color-accent-hover);
+}
+
+#app-footer {
+  flex-shrink: 0;
+  text-align: center;
+  padding: 10px 20px;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  border-top: 1px solid var(--color-border);
+}
+
+#app-footer a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+#app-footer a:hover {
+  text-decoration: underline;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;
