@@ -7,7 +7,8 @@
     "test:unit": "bun test ./tests/*.test.js",
     "test:bundles-unit": "bun test ./tests/bundles.test.js",
     "test:integration": "npx playwright test tests/sync.spec.js",
-    "test:browser": "npx playwright test tests/browser.spec.js"
+    "test:browser": "npx playwright test tests/browser.spec.js",
+    "test:prod": "BASE_URL=https://flare576.com/myLibrary npx playwright test tests/sync.spec.js tests/steam.spec.js tests/bundles.spec.js tests/bundles-detail.spec.js tests/itch.spec.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.0"

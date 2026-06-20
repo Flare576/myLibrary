@@ -1,5 +1,7 @@
 const { defineConfig, devices } = require('@playwright/test');
 
+const BASE_URL = process.env.BASE_URL || 'http://127.0.0.1:8181';
+
 module.exports = defineConfig({
   testDir: './tests',
   testMatch: ['**/*.spec.js'],
@@ -10,7 +12,7 @@ module.exports = defineConfig({
   reporter: 'list',
 
   use: {
-    baseURL: 'http://127.0.0.1:8181',
+    baseURL: BASE_URL,
     launchOptions: {
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     },
